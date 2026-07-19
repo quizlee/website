@@ -50,7 +50,7 @@ import ActivityLogPage from './pages/admin/ActivityLogPage';
 import AdminBulkImportPage from './pages/admin/BulkImportPage';
 
 function RootRedirector() {
-  const { profile, loading, initialized } = useAuthStore();
+  const { user, profile, loading, initialized } = useAuthStore();
   const navigate = useNavigate();
   const [checkingSetup, setCheckingSetup] = useState(true);
 
@@ -79,11 +79,11 @@ function RootRedirector() {
     );
   }
 
-  if (!profile) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!profile.role) {
+  if (!profile || !profile.role) {
     const signupRole = localStorage.getItem('oauth_signup_role');
     if (signupRole === 'student') {
       return <Navigate to="/complete-setup" replace />;

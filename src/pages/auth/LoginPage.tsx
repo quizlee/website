@@ -16,7 +16,7 @@ const LAST_AUTH_PROVIDER_KEY = 'quizlee_last_auth_provider';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { profile } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,6 +52,18 @@ export default function LoginPage() {
       navigate(window.location.pathname, { replace: true });
     }
   }, [navigate]);
+
+  // Redirect if logged in but no profile role yet (e.g. Google Auth setup)
+  useEffect(() => {
+    if (user && !profile?.role) {
+      const signupRole = localStorage.getItem('oauth_signup_role');
+      if (signupRole === 'student') {
+        navigate('/complete-setup', { replace: true });
+      } else {
+        navigate('/register', { replace: true });
+      }
+    }
+  }, [user, profile, navigate]);
 
   // Redirect if already logged in
   if (profile?.role) {
