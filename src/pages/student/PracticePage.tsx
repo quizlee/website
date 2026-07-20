@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -6,6 +6,9 @@ import { toast } from '../../components/ui/Toast';
 import type { Subject, Chapter, Activity } from '../../lib/types';
 import { X, ChevronLeft, ChevronRight, Check, BookOpen, Sparkles, Lock } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+
+// In-memory cache for chapters and their activity types per subject ID
+const chapterDataCache = new Map<string, { chapters: Chapter[]; contentMap: Record<string, string[]> }>();
 
 // Gradient palettes for subject cards (cycles through these)
 const SUBJECT_GRADIENTS = [
@@ -98,6 +101,7 @@ export default function PracticePage() {
   // Curriculum state
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapterContentMap, setChapterContentMap] = useState<Record<string, string[]>>({});
   const [selectedSubjectIdx, setSelectedSubjectIdx] = useState(() => {
     const saved = sessionStorage.getItem('practice_selected_subject_idx');
     return saved ? Number(saved) : 0;
@@ -141,27 +145,18 @@ export default function PracticePage() {
       });
   }, []);
 
-  const [availableActivityTypes, setAvailableActivityTypes] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (selectedChapterIds.length === 0) {
-      setAvailableActivityTypes([]);
-      return;
-    }
-
-    supabase
-      .from('content')
-      .select('activity_type')
-      .in('chapter_id', selectedChapterIds)
-      .then(({ data }) => {
-        if (data) {
-          const types = Array.from(new Set(data.map((item: any) => item.activity_type)));
-          setAvailableActivityTypes(types);
-        } else {
-          setAvailableActivityTypes([]);
-        }
-      });
-  }, [selectedChapterIds]);
+  // Compute available activity types instantaneously without network latency when selected chapters change
+  const availableActivityTypes = useMemo(() => {
+    if (selectedChapterIds.length === 0) return [];
+    const typesSet = new Set<string>();
+    selectedChapterIds.forEach((id) => {
+      const types = chapterContentMap[id];
+      if (types) {
+        types.forEach((t) => typesSet.add(t));
+      }
+    });
+    return Array.from(typesSet);
+  }, [selectedChapterIds, chapterContentMap]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -175,7 +170,7 @@ export default function PracticePage() {
   };
 
   const selectedSubject = subjects[selectedSubjectIdx] ?? null;
-  const gradient = getSubjectGradient(selectedSubject?.name);
+  const gradient = useMemo(() => getSubjectGradient(selectedSubject?.name), [selectedSubject?.name]);
 
   // Fetch subjects
   useEffect(() => {
@@ -193,26 +188,69 @@ export default function PracticePage() {
       });
   }, [profile]);
 
-  // Fetch chapters when subject changes
+  // Fetch chapters & content types when subject changes (with instant cache load)
   useEffect(() => {
-    if (!selectedSubject) { setChapters([]); return; }
-    setLoadingChapters(true);
-    supabase
-      .from('chapters')
-      .select('*')
-      .eq('subject_id', selectedSubject.id)
-      .order('sort_order')
-      .order('created_at')
-      .then(({ data }) => {
-        if (data) {
-          setChapters(data);
-          const validIds = data.map((c) => c.id);
+    if (!selectedSubject) { 
+      setChapters([]); 
+      setChapterContentMap({});
+      return; 
+    }
+
+    const cached = chapterDataCache.get(selectedSubject.id);
+    if (cached) {
+      setChapters(cached.chapters);
+      setChapterContentMap(cached.contentMap);
+      const validIds = cached.chapters.map((c) => c.id);
+      setSelectedChapterIds((prev) => prev.filter((id) => validIds.includes(id)));
+      setLoadingChapters(false);
+      if (chapterScrollRef.current) chapterScrollRef.current.scrollLeft = 0;
+    } else {
+      setLoadingChapters(true);
+    }
+
+    async function fetchChaptersAndContent() {
+      try {
+        const { data: chapterData } = await supabase
+          .from('chapters')
+          .select('*')
+          .eq('subject_id', selectedSubject.id)
+          .order('sort_order')
+          .order('created_at');
+
+        if (chapterData) {
+          const validIds = chapterData.map((c) => c.id);
+          let contentMap: Record<string, string[]> = {};
+
+          if (validIds.length > 0) {
+            const { data: contentData } = await supabase
+              .from('content')
+              .select('chapter_id, activity_type')
+              .in('chapter_id', validIds);
+
+            if (contentData) {
+              contentData.forEach((item: any) => {
+                if (!contentMap[item.chapter_id]) contentMap[item.chapter_id] = [];
+                if (!contentMap[item.chapter_id].includes(item.activity_type)) {
+                  contentMap[item.chapter_id].push(item.activity_type);
+                }
+              });
+            }
+          }
+
+          chapterDataCache.set(selectedSubject.id, { chapters: chapterData, contentMap });
+          setChapters(chapterData);
+          setChapterContentMap(contentMap);
           setSelectedChapterIds((prev) => prev.filter((id) => validIds.includes(id)));
         }
+      } catch (err) {
+        console.error('Failed to load chapters:', err);
+      } finally {
         setLoadingChapters(false);
-        // Scroll chapter list back to start
         if (chapterScrollRef.current) chapterScrollRef.current.scrollLeft = 0;
-      });
+      }
+    }
+
+    fetchChaptersAndContent();
   }, [selectedSubject?.id]);
 
 

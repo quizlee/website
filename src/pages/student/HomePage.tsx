@@ -119,47 +119,52 @@ export default function StudentHomePage() {
       });
   }, [profile]);
 
-  // Fetch chapters for the selected subject
+  // Fetch chapters and available activity types for the selected subject
   useEffect(() => {
     if (!selectedSubject) {
       setChapters([]);
-      return;
-    }
-
-    supabase
-      .from('chapters')
-      .select('*')
-      .eq('subject_id', selectedSubject)
-      .order('sort_order')
-      .order('created_at')
-      .then(({ data }) => {
-        if (data) {
-          setChapters(data);
-        }
-      });
-  }, [selectedSubject]);
-
-  // Query content table to find which activities have content under ANY of the subject chapters
-  useEffect(() => {
-    if (chapters.length === 0) {
       setAvailableActivityTypes([]);
       return;
     }
 
-    const chapterIds = chapters.map(c => c.id);
-    supabase
-      .from('content')
-      .select('activity_type')
-      .in('chapter_id', chapterIds)
-      .then(({ data }) => {
-        if (data) {
-          const types = Array.from(new Set(data.map((item: any) => item.activity_type)));
-          setAvailableActivityTypes(types);
+    async function loadChaptersAndTypes() {
+      try {
+        const { data: chapterData } = await supabase
+          .from('chapters')
+          .select('*')
+          .eq('subject_id', selectedSubject)
+          .order('sort_order')
+          .order('created_at');
+
+        if (chapterData) {
+          setChapters(chapterData);
+          const chapterIds = chapterData.map(c => c.id);
+          if (chapterIds.length > 0) {
+            const { data: contentData } = await supabase
+              .from('content')
+              .select('activity_type')
+              .in('chapter_id', chapterIds);
+
+            if (contentData) {
+              const types = Array.from(new Set(contentData.map((item: any) => item.activity_type)));
+              setAvailableActivityTypes(types);
+            } else {
+              setAvailableActivityTypes([]);
+            }
+          } else {
+            setAvailableActivityTypes([]);
+          }
         } else {
+          setChapters([]);
           setAvailableActivityTypes([]);
         }
-      });
-  }, [chapters]);
+      } catch (err) {
+        console.error('Failed to load chapters:', err);
+      }
+    }
+
+    loadChaptersAndTypes();
+  }, [selectedSubject]);
 
   // Fetch weekly attempts count
   useEffect(() => {

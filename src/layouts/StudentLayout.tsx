@@ -12,8 +12,8 @@ import {
   Star,
   Settings,
   Award,
-  Plus,
-  Minus,
+  // Plus,
+  // Minus,
   User,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
@@ -76,6 +76,7 @@ export default function StudentLayout() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  /*
   const handleUpdatePoints = async (amount: number) => {
     if (!profile) return;
     const newPoints = Math.max(0, (profile.points || 0) + amount);
@@ -94,6 +95,7 @@ export default function StudentLayout() {
       console.error('Failed to sync points:', err);
     }
   };
+  */
 
   const isPlayPage = location.pathname === '/student/play';
 
@@ -139,23 +141,7 @@ export default function StudentLayout() {
     }
   }, [profile?.points]);
 
-  useEffect(() => {
-    // Inject fonts and icons stylesheets
-    const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
 
-    const fontLink = document.createElement('link');
-    fontLink.href = 'https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap';
-    fontLink.rel = 'stylesheet';
-    document.head.appendChild(fontLink);
-
-    return () => {
-      document.head.removeChild(link);
-      document.head.removeChild(fontLink);
-    };
-  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -249,7 +235,8 @@ export default function StudentLayout() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Minus icon */}
+              {/* Increase & Decrease XP buttons (Hidden for now - unhide later) */}
+              {/* 
               <button 
                 onClick={() => handleUpdatePoints(-100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-red-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -258,7 +245,6 @@ export default function StudentLayout() {
                 <Minus size={20} />
               </button>
 
-              {/* Plus icon */}
               <button 
                 onClick={() => handleUpdatePoints(100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-green-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -266,6 +252,7 @@ export default function StudentLayout() {
               >
                 <Plus size={20} />
               </button>
+              */}
 
               {/* Leaderboard icon */}
               <button 
