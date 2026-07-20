@@ -12,8 +12,8 @@ import {
   Star,
   Settings,
   Award,
-  // Plus,
-  // Minus,
+  Plus,
+  Minus,
   User,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
@@ -76,7 +76,6 @@ export default function StudentLayout() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  /*
   const handleUpdatePoints = async (amount: number) => {
     if (!profile) return;
     const newPoints = Math.max(0, (profile.points || 0) + amount);
@@ -95,7 +94,6 @@ export default function StudentLayout() {
       console.error('Failed to sync points:', err);
     }
   };
-  */
 
   const isPlayPage = location.pathname === '/student/play';
 
@@ -235,8 +233,7 @@ export default function StudentLayout() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Increase & Decrease XP buttons (Hidden for now - unhide later) */}
-              {/* 
+              {/* Minus icon */}
               <button 
                 onClick={() => handleUpdatePoints(-100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-red-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -245,6 +242,7 @@ export default function StudentLayout() {
                 <Minus size={20} />
               </button>
 
+              {/* Plus icon */}
               <button 
                 onClick={() => handleUpdatePoints(100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-green-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -252,7 +250,6 @@ export default function StudentLayout() {
               >
                 <Plus size={20} />
               </button>
-              */}
 
               {/* Leaderboard icon */}
               <button 
