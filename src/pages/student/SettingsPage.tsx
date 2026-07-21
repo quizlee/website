@@ -757,8 +757,6 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
 
   // Render Points & Titles tab content
   const renderPointsSettings = () => {
-    
-    const currentTitleObj = [...titles].reverse().find(t => totalXP >= t.xp) || titles[0];
     const nextTitleObj = titles.find(t => t.xp > totalXP) || null;
 
     const handleEquipTitle = async (titleName: string | null) => {

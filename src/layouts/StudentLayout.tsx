@@ -12,54 +12,9 @@ import {
   Star,
   Settings,
   Award,
-  Plus,
-  Minus,
   User,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
-import { toast } from '../components/ui/Toast';
-
-const titles = [
-  { xp: 100, title: '🔍 Fact Finder' },
-  { xp: 250, title: '🌿 Seed Sower' },
-  { xp: 400, title: '💡 Bright Spark' },
-  { xp: 600, title: '🚀 Quiz Cadet' },
-  { xp: 800, title: '🎒 Eager Learner' },
-  { xp: 1000, title: '📜 Scroll Reader' },
-  { xp: 1250, title: '🧭 Path Finder' },
-  { xp: 1500, title: '📖 Knowledge Seeker' },
-  { xp: 1800, title: '✍️ Star Scribe' },
-  { xp: 2100, title: '🧩 Riddle Solver' },
-  { xp: 2500, title: '🧠 Brain Booster' },
-  { xp: 3000, title: '🔬 Lab Assistant' },
-  { xp: 3500, title: '🧙‍♂️ Word Wizard' },
-  { xp: 4000, title: '🏹 Chapter Conqueror' },
-  { xp: 4600, title: '🗺️ Quest Explorer' },
-  { xp: 5200, title: '📊 Data Analyst' },
-  { xp: 6000, title: '📝 Smart Scholar' },
-  { xp: 7000, title: '🏛️ Academy Member' },
-  { xp: 8000, title: '🔑 Truth Keeper' },
-  { xp: 9200, title: '🛡️ Wisdom Warrior' },
-  { xp: 10500, title: '☄️ Comet Chaser' },
-  { xp: 12000, title: '🥷 Quiz Ninja' },
-  { xp: 13500, title: '📚 Library Patron' },
-  { xp: 15000, title: '♟️ Strategy Master' },
-  { xp: 17000, title: '🧪 Science Scout' },
-  { xp: 19000, title: '🌌 Star Gazer' },
-  { xp: 21500, title: '⚔️ Knowledge Knight' },
-  { xp: 24000, title: '🏅 Honor Roll' },
-  { xp: 26500, title: '🎨 Creative Genius' },
-  { xp: 29000, title: '👑 Academic Ace' },
-  { xp: 32000, title: '🔮 Master Mind' },
-  { xp: 35000, title: '🤖 Tech Titan' },
-  { xp: 38000, title: '🎭 Lore Keeper' },
-  { xp: 41000, title: '🔭 Elite Einstein' },
-  { xp: 44000, title: '🚀 Galaxy Voyager' },
-  { xp: 46500, title: '🏛️ Scholar Supreme' },
-  { xp: 48500, title: '⚡ Ultimate Genius' },
-  { xp: 49500, title: '🪐 Cosmic Overlord' },
-  { xp: 50000, title: '🌟 Quizlee Legend' },
-];
 
 const navItems = [
   { to: '/student', icon: Home, label: 'Home', end: true },
@@ -69,30 +24,11 @@ const navItems = [
 ];
 
 export default function StudentLayout() {
-  const { profile, setProfile } = useAuthStore();
+  const { profile } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const handleUpdatePoints = async (amount: number) => {
-    if (!profile) return;
-    const newPoints = Math.max(0, (profile.points || 0) + amount);
-    
-    setProfile({
-      ...profile,
-      points: newPoints,
-    });
-
-    try {
-      await supabase
-        .from('profiles')
-        .update({ points: newPoints })
-        .eq('id', profile.id);
-    } catch (err) {
-      console.error('Failed to sync points:', err);
-    }
-  };
 
   const isPlayPage = location.pathname === '/student/play';
 
@@ -138,8 +74,6 @@ export default function StudentLayout() {
     }
   }, [profile?.points]);
 
-
-
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -167,37 +101,7 @@ export default function StudentLayout() {
     return Math.min(100, Math.floor(Math.sqrt(totalXP / 5)));
   };
   const currentLevel = getLevelFromXP(profile?.points || 0);
-  const currentTitleObj = [...titles].reverse().find(t => (profile?.points || 0) >= t.xp) || titles[0];
   const currentTitle = profile?.title || '';
-
-  const getTodayXPEarned = () => {
-    if (!profile) return 0;
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    return profile.last_xp_earned_date === todayStr ? (profile.daily_xp_earned || 0) : 0;
-  };
-
-  const handleResetDailyQuota = async () => {
-    if (!profile) return;
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ daily_xp_earned: 0 })
-        .eq('id', profile.id);
-
-      if (error) {
-        toast(error.message, 'error');
-      } else {
-        setProfile({
-          ...profile,
-          daily_xp_earned: 0,
-        });
-        toast("Daily XP quota reset! You can earn another 200 XP today. ⚡", 'success');
-      }
-    } catch (err) {
-      console.error(err);
-      toast("Failed to reset daily quota", 'error');
-    }
-  };
 
   return (
     <div className={`min-h-screen ${isPlayPage ? 'bg-white' : 'bg-background'} font-body-md text-on-surface selection:bg-primary-container selection:text-primary relative overflow-x-hidden`}>
