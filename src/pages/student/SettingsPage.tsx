@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
-import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown } from 'lucide-react';
+import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown, Plus } from 'lucide-react';
 import { themes, getSavedTheme, saveTheme } from '../../lib/theme';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../../components/ui/Avatar';
@@ -15,22 +15,21 @@ import { avatarPresets, avatarBgColors, parseAvatar, adjustColorShade, parseColo
 
 
 const milestones = [
-  { lvl: 1, label: 'Initiation', icon: Compass },
-  { lvl: 5, label: 'Awakening', icon: Zap },
-  { lvl: 10, label: 'Breakthrough', icon: Rocket },
-  { lvl: 20, label: 'Ascent', icon: Award },
-  { lvl: 30, label: 'Mastery', icon: Shield },
-  { lvl: 40, label: 'Eminence', icon: Smile },
-  { lvl: 50, label: 'Supremacy', icon: Trophy },
-  { lvl: 60, label: 'Transcendence', icon: RefreshCw },
-  { lvl: 70, label: 'Immortality', icon: Lock },
-  { lvl: 80, label: 'Infinity', icon: Star },
-  { lvl: 90, label: 'Singularity', icon: Palette },
-  { lvl: 100, label: 'Zenith', icon: Crown },
+  { lvl: 1, xp: 100, label: 'Initiation', icon: Compass },
+  { lvl: 5, xp: 200, label: 'Awakening', icon: Zap },
+  { lvl: 10, xp: 500, label: 'Breakthrough', icon: Rocket },
+  { lvl: 20, xp: 2000, label: 'Ascent', icon: Award },
+  { lvl: 30, xp: 4500, label: 'Mastery', icon: Shield },
+  { lvl: 40, xp: 8000, label: 'Eminence', icon: Smile },
+  { lvl: 50, xp: 12500, label: 'Supremacy', icon: Trophy },
+  { lvl: 60, xp: 18000, label: 'Transcendence', icon: RefreshCw },
+  { lvl: 70, xp: 24500, label: 'Immortality', icon: Lock },
+  { lvl: 80, xp: 32000, label: 'Infinity', icon: Star },
+  { lvl: 90, xp: 40500, label: 'Singularity', icon: Palette },
+  { lvl: 100, xp: 50000, label: 'Zenith', icon: Crown },
 ];
 
 const titles = [
-  { xp: 0, title: '🎓 Curious Rookie' },
   { xp: 100, title: '🔍 Fact Finder' },
   { xp: 250, title: '🌿 Seed Sower' },
   { xp: 400, title: '💡 Bright Spark' },
@@ -162,6 +161,38 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateChecked, setUpdateChecked] = useState(false);
 
+  // Equipped Badges state for multi-collecting
+  const [equippedBadges, setEquippedBadges] = useState<string[]>(() => {
+    if (!profile?.id) return [];
+    const saved = localStorage.getItem(`equipped_badges_${profile.id}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const handleToggleEquipBadge = (badgeLabel: string) => {
+    if (!profile?.id) return;
+    setEquippedBadges((prev) => {
+      const isEquipped = prev.includes(badgeLabel);
+      const next = isEquipped
+        ? prev.filter((b) => b !== badgeLabel)
+        : [...prev, badgeLabel];
+      localStorage.setItem(`equipped_badges_${profile.id}`, JSON.stringify(next));
+      toast(
+        isEquipped
+          ? `Unequipped badge: ${badgeLabel}`
+          : `Equipped badge: ${badgeLabel}! 🏅`,
+        'success'
+      );
+      return next;
+    });
+  };
+
   // XP count animation state for points settings tab
   const [displayedXP, setDisplayedXP] = useState(0);
 
@@ -203,9 +234,10 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
   // Calculate current level and total XP globally for SettingsPage
   const totalXP = profile?.points || 0;
   const currentLevel = (() => {
-    if (totalXP < 20) return 1;
-    const lvl = Math.floor(Math.sqrt(totalXP / 5));
-    return Math.min(lvl, 100);
+    if (totalXP < 100) return 0;
+    if (totalXP < 200) return Math.min(4, Math.floor(1 + (totalXP - 100) / 25));
+    if (totalXP < 500) return Math.min(9, Math.floor(5 + (totalXP - 200) / 60));
+    return Math.min(100, Math.floor(Math.sqrt(totalXP / 5)));
   })();
 
   // Fetch School and Class names for affiliation display
@@ -374,7 +406,7 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
     { key: 'avatar', label: 'Avatar', icon: Smile },
     { key: 'profile_view', label: 'User Profile', icon: User },
     { key: 'points', label: 'Points & Titles', icon: Award },
-    { key: 'level', label: 'Levels & Milestones', icon: Trophy },
+    { key: 'level', label: 'Levels and Badges', icon: Trophy },
     { key: 'theme', label: 'Themes', icon: Palette },
     { key: 'privacy', label: 'Privacy', icon: Shield, locked: true },
     { key: 'version', label: 'App Version', icon: RefreshCw },
@@ -532,9 +564,18 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
 
   // Render Level tab content
   const renderLevelSettings = () => {
+    const getXPForLevel = (lvl: number) => {
+      if (lvl <= 0) return 0;
+      if (lvl === 1) return 100;
+      if (lvl < 5) return 100 + (lvl - 1) * 25;
+      if (lvl === 5) return 200;
+      if (lvl < 10) return 200 + (lvl - 5) * 60;
+      return 5 * lvl * lvl;
+    };
+
     const nextLevel = Math.min(currentLevel + 1, 100);
-    const currentLevelXP = currentLevel <= 1 ? 0 : 5 * (currentLevel * currentLevel);
-    const nextLevelXP = 5 * (nextLevel * nextLevel);
+    const currentLevelXP = getXPForLevel(currentLevel);
+    const nextLevelXP = getXPForLevel(nextLevel);
 
     const levelProgressPercentage = (() => {
       if (currentLevel >= 100) return 100;
@@ -672,11 +713,34 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
                         }`} title={isPassed ? m.label : 'Locked Milestone'}>
                           {m.label}
                         </h4>
+                        <span className={`block text-[11px] font-bold mt-0.5 ${
+                          isPassed ? 'text-surface-500' : 'text-surface-400'
+                        }`}>
+                          {m.xp.toLocaleString()} XP
+                        </span>
                       </div>
                     </div>
 
-                    {/* Status Badge */}
-                    {!isPassed && (
+                    {/* Status Badge / Equip Button */}
+                    {isPassed ? (
+                      equippedBadges.includes(m.label) ? (
+                        <button
+                          onClick={() => handleToggleEquipBadge(m.label)}
+                          className="text-xs font-bold text-success-700 bg-success-50 hover:bg-success-100 border border-success-200 px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow-sm shrink-0"
+                          title="Click to Unequip Badge"
+                        >
+                          Equipped
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleEquipBadge(m.label)}
+                          className="text-xs font-bold text-primary bg-primary-50 hover:bg-primary-100 border border-primary-200 px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow-sm shrink-0"
+                          title="Click to Equip Badge"
+                        >
+                          Equip
+                        </button>
+                      )
+                    ) : (
                       <div className="text-[10px] font-extrabold bg-surface-100 text-surface-500 border border-surface-200 px-2.5 py-1 rounded-xl flex items-center gap-1 uppercase tracking-wider shrink-0 select-none">
                         <Lock size={10} /> Locked
                       </div>
@@ -744,7 +808,7 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
                 Current Title
               </span>
               <h3 className="font-black text-3xl text-surface-950 font-headline-md mt-2.5 mb-1.5">
-                {profile?.title || currentTitleObj.title}
+                {profile?.title || 'No Title Equipped'}
               </h3>
               <p className="text-sm text-surface-550 mb-4 font-body-md">
                 You have accumulated <strong className="text-surface-700">{totalXP} XP</strong>.
@@ -1077,15 +1141,17 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
   // Render User Profile tab content
   const renderUserProfileSettings = () => {
     const initials = profile?.full_name?.[0]?.toUpperCase() || '?';
-    const currentTitleObj = [...titles].reverse().find(t => totalXP >= t.xp) || titles[0];
-
-    const fullTitle = profile?.title || currentTitleObj.title;
-    const firstSpaceIndex = fullTitle.indexOf(' ');
-    let titleEmoji = '🎓';
-    let titleText = fullTitle;
-    if (firstSpaceIndex !== -1) {
-      titleEmoji = fullTitle.substring(0, firstSpaceIndex).trim();
-      titleText = fullTitle.substring(firstSpaceIndex + 1).trim();
+    const fullTitle = profile?.title || '';
+    let titleEmoji = '🏷️';
+    let titleText = 'No Title Equipped';
+    if (fullTitle) {
+      const firstSpaceIndex = fullTitle.indexOf(' ');
+      if (firstSpaceIndex !== -1) {
+        titleEmoji = fullTitle.substring(0, firstSpaceIndex).trim();
+        titleText = fullTitle.substring(firstSpaceIndex + 1).trim();
+      } else {
+        titleText = fullTitle;
+      }
     }
 
     return (
@@ -1128,24 +1194,55 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
         {/* Stats & Level Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Experience Title Card */}
-          <Card className="p-6 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg bg-white relative overflow-hidden flex flex-col justify-center">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100 shadow-sm">
-                <span className="text-2xl">{titleEmoji}</span>
+          <div 
+            onClick={() => setActiveTab('points')}
+            className={`p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer relative overflow-hidden flex items-center justify-between gap-4 ${
+              fullTitle
+                ? 'bg-white border border-surface-200 shadow-sm hover:shadow-md'
+                : 'bg-slate-50/90 border-2 border-dashed border-slate-300 shadow-inner hover:border-primary/50'
+            }`}
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
+                fullTitle
+                  ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm'
+                  : 'bg-white text-primary border-2 border-dashed border-primary/50 shadow-xs'
+              }`}>
+                {fullTitle ? (
+                  <span className="text-2xl">{titleEmoji}</span>
+                ) : (
+                  <Plus size={22} className="stroke-[2.5]" />
+                )}
               </div>
               <div className="min-w-0">
-                <span className="inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full select-none mb-1.5">
+                <span className={`inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full select-none mb-1.5 border ${
+                  fullTitle
+                    ? 'text-amber-800 bg-amber-50 border-amber-200'
+                    : 'text-slate-500 bg-slate-200/70 border-slate-300/60'
+                }`}>
                   Current Title
                 </span>
-                <h4 className="font-black text-lg text-surface-900 leading-snug truncate">
+                <h4 className={`font-black text-lg leading-snug truncate ${
+                  fullTitle ? 'text-surface-900' : 'text-slate-500 font-bold'
+                }`}>
                   {titleText}
                 </h4>
-                <p className="text-xs text-surface-500 mt-1 font-body-md">
-                  Achieved on {currentTitleObj.xp} XP
+                <p className={`text-xs mt-1 font-body-md ${
+                  fullTitle ? 'text-surface-500' : 'text-slate-400 font-semibold'
+                }`}>
+                  {fullTitle ? 'Equipped Title' : 'Click to equip a title'}
                 </p>
               </div>
             </div>
-          </Card>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); setActiveTab('points'); }}
+              className="text-xs font-bold text-primary hover:underline shrink-0 cursor-pointer"
+              title={fullTitle ? 'Change Title' : 'Equip Title'}
+            >
+              {fullTitle ? 'Change' : 'Equip'}
+            </button>
+          </div>
 
           {/* Competitive Rank Arena Widget */}
           <Card className="p-6 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg bg-white relative overflow-hidden flex flex-col justify-center">
@@ -1205,30 +1302,74 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
           <div className="absolute -left-12 -top-12 w-24 h-24 bg-primary-50/20 rounded-full blur-xl pointer-events-none" />
           
           <div className="flex flex-col">
-            <span className="inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider text-primary bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full select-none mb-6 w-fit">
-              Badge Collection
-            </span>
-
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-y-6 gap-x-4 items-center justify-items-center">
-              {milestones.filter(m => currentLevel >= m.lvl).map((m) => {
-                const MilestoneIcon = m.icon;
-                return (
-                  <div 
-                    key={m.label} 
-                    className="group flex flex-col items-center gap-2 cursor-pointer transition-all duration-300 hover:scale-105"
-                    title={`${m.label} (Unlocked at Level ${m.lvl})`}
-                  >
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm relative transition-all duration-300 bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200/60 text-primary">
-                      <MilestoneIcon size={20} className="group-hover:animate-bounce-in stroke-[2.5]" />
-                      <div className="absolute inset-0 rounded-full border border-primary-400/20 group-hover:scale-110 transition-transform duration-300" />
-                    </div>
-                    <span className="text-[10px] font-extrabold text-surface-700 font-body-md text-center max-w-[70px] truncate">
-                      {m.label}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between mb-6">
+              <span className="inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider text-primary bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full select-none">
+                Badge Collection ({equippedBadges.length})
+              </span>
+              {equippedBadges.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('level')}
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus size={14} /> Manage Badges
+                </button>
+              )}
             </div>
+
+            {equippedBadges.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4 border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50/80 shadow-inner my-2">
+                <button
+                  onClick={() => setActiveTab('level')}
+                  className="w-14 h-14 rounded-full border-2 border-dashed border-primary/50 bg-white text-primary flex items-center justify-center shadow-xs hover:scale-110 hover:border-primary hover:bg-primary-50 transition-all cursor-pointer group mb-2.5"
+                  title="Equip Badges in Levels and Badges"
+                >
+                  <Plus size={26} className="group-hover:rotate-90 transition-transform duration-300 stroke-[2.5]" />
+                </button>
+                <p className="text-xs font-extrabold text-slate-500 text-center">No Badges Equipped</p>
+                <button
+                  onClick={() => setActiveTab('level')}
+                  className="text-[11px] font-extrabold text-primary hover:underline mt-1 cursor-pointer uppercase tracking-wider"
+                >
+                  + Equip Badges in Levels
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-y-6 gap-x-4 items-center justify-items-center">
+                {milestones.filter(m => equippedBadges.includes(m.label)).map((m) => {
+                  const MilestoneIcon = m.icon;
+                  return (
+                    <div 
+                      key={m.label} 
+                      onClick={() => setActiveTab('level')}
+                      className="group flex flex-col items-center gap-2 cursor-pointer transition-all duration-300 hover:scale-105"
+                      title={`${m.label} (Level ${m.lvl}) - Click to manage`}
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm relative transition-all duration-300 bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200/60 text-primary">
+                        <MilestoneIcon size={20} className="group-hover:animate-bounce-in stroke-[2.5]" />
+                        <div className="absolute inset-0 rounded-full border border-primary-400/20 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <span className="text-[10px] font-extrabold text-surface-700 font-body-md text-center max-w-[70px] truncate">
+                        {m.label}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Dotted circular (+) button to add more */}
+                <div 
+                  onClick={() => setActiveTab('level')}
+                  className="group flex flex-col items-center gap-2 cursor-pointer transition-all duration-300 hover:scale-105"
+                  title="Equip more badges from Levels"
+                >
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed border-primary/40 bg-slate-50 text-primary group-hover:border-primary group-hover:bg-primary-50 transition-all duration-300 shadow-2xs">
+                    <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 font-body-md text-center">
+                    Add
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       </div>

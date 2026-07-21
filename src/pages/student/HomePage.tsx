@@ -28,9 +28,7 @@ export default function StudentHomePage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   
   // Persistence state
-  const [selectedSubject, setSelectedSubject] = useState<string>(() => {
-    return localStorage.getItem('home_selected_subject') || '';
-  });
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<string>(() => {
     return localStorage.getItem('home_question_count') || '10';
   });
@@ -44,13 +42,7 @@ export default function StudentHomePage() {
   // Weekly Goal progress state
   const [weeklyCount, setWeeklyCount] = useState(0);
 
-  // Save selected subject and question count to localStorage
-  useEffect(() => {
-    if (selectedSubject) {
-      localStorage.setItem('home_selected_subject', selectedSubject);
-    }
-  }, [selectedSubject]);
-
+  // Save selected question count to localStorage
   useEffect(() => {
     localStorage.setItem('home_question_count', selectedQuestionCount);
   }, [selectedQuestionCount]);
@@ -108,12 +100,6 @@ export default function StudentHomePage() {
       .then(({ data }) => {
         if (data) {
           setSubjects(data);
-          const savedSubject = localStorage.getItem('home_selected_subject');
-          if (savedSubject && data.some(s => s.id === savedSubject)) {
-            setSelectedSubject(savedSubject);
-          } else if (data.length > 0) {
-            setSelectedSubject(data[0].id);
-          }
         }
         setLoadingSubjects(false);
       });
@@ -183,6 +169,11 @@ export default function StudentHomePage() {
   }, [profile]);
 
   const handleActivityClick = (type: string) => {
+    if (!selectedSubject) {
+      toast('Please select a subject first! 📚', 'error');
+      return;
+    }
+
     if (chapters.length === 0) {
       toast('No chapters available for the selected subject! 📚', 'error');
       return;
@@ -198,7 +189,7 @@ export default function StudentHomePage() {
   };
 
   const handlePlayHero = () => {
-    handleActivityClick('quiz');
+    toast('Daily Activity is coming soon! 🚀', 'info');
   };
 
   // Weekly Goal helpers
@@ -249,11 +240,32 @@ export default function StudentHomePage() {
             <span className="font-extrabold text-sm text-warning-950">500 XP</span>
           </div>
 
+          {/* Glassmorphic coming soon overlay */}
+          <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-[1.5px] flex items-center justify-center pointer-events-auto">
+            <div 
+              onClick={handlePlayHero}
+              className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-6 py-3.5 rounded-2xl shadow-xl border border-slate-100/80 hover:scale-105 transition-transform cursor-pointer"
+            >
+              <div className="w-9 h-9 bg-primary-50 text-primary rounded-xl flex items-center justify-center shrink-0 border border-primary-100">
+                <Sparkles size={18} className="animate-pulse text-primary" />
+              </div>
+              <div className="text-left">
+                <h4 className="font-extrabold text-base text-surface-900 leading-none">Daily Activity</h4>
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest block mt-1 leading-none">🚀 Coming Soon</span>
+              </div>
+            </div>
+          </div>
+
           <div className="relative z-10 max-w-2xl p-6 md:p-8 flex flex-col items-start w-full flex-grow">
             <div className="flex flex-col items-start">
-              <div className="inline-flex items-center gap-1.5 bg-primary text-white px-3.5 py-1.5 rounded-full font-bold text-xs uppercase tracking-wider mb-4 shadow-sm shadow-primary/20 animate-bounce select-none">
-                <span className="material-symbols-outlined text-[16px] animate-pulse">rocket_launch</span>
-                <span>DAILY ACTIVITY</span>
+              <div className="flex flex-wrap items-center gap-2.5 mb-4">
+                <div className="inline-flex items-center gap-1.5 bg-primary text-white px-3.5 py-1.5 rounded-full font-bold text-xs uppercase tracking-wider shadow-sm shadow-primary/20 select-none">
+                  <span className="material-symbols-outlined text-[16px] animate-pulse">rocket_launch</span>
+                  <span>DAILY ACTIVITY</span>
+                </div>
+                <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full border border-amber-200/80 shadow-xs flex items-center gap-1">
+                  🚀 Coming Soon
+                </span>
               </div>
               
               <h2 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-800 to-indigo-900 tracking-tight leading-none mb-2">
@@ -316,13 +328,16 @@ export default function StudentHomePage() {
                 className="appearance-none bg-white border border-surface-200 text-primary font-bold font-label-md text-label-md pl-5 pr-10 py-2.5 rounded-full cursor-pointer hover:bg-surface-50 transition-all focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 shadow-sm"
               >
                 {loadingSubjects ? (
-                  <option>Loading...</option>
+                  <option value="">Loading...</option>
                 ) : subjects.length === 0 ? (
-                  <option>No Subjects</option>
+                  <option value="">No Subjects</option>
                 ) : (
-                  subjects.map((sub) => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))
+                  <>
+                    <option value="">Select Subject</option>
+                    {subjects.map((sub) => (
+                      <option key={sub.id} value={sub.id}>{sub.name}</option>
+                    ))}
+                  </>
                 )}
               </select>
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-primary">
@@ -335,11 +350,15 @@ export default function StudentHomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
           {activities.map((activity) => {
             const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
-            const isContentAvailable = availableActivityTypes.includes(activity.key);
+            const isContentAvailable = selectedSubject ? availableActivityTypes.includes(activity.key) : false;
             
             const handleClick = () => {
               if (activity.is_locked) {
                 toast(`${activity.label} is locked 🔒`, 'error');
+                return;
+              }
+              if (!selectedSubject) {
+                toast('Please select a subject first! 📚', 'error');
                 return;
               }
               if (!isContentAvailable) {
@@ -367,7 +386,14 @@ export default function StudentHomePage() {
                     </span>
                   </div>
                 )}
-                {!activity.is_locked && !isContentAvailable && (
+                {!activity.is_locked && !selectedSubject && (
+                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-sky-200">
+                      📚 Select Subject
+                    </span>
+                  </div>
+                )}
+                {!activity.is_locked && selectedSubject && !isContentAvailable && (
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
                     <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
                       🚀 Coming Soon

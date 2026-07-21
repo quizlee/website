@@ -536,7 +536,7 @@ export default function PracticePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
           {activities.filter(a => a.zone === 'test').map((activity) => {
             const cardColor = activity.color || '#6366f1';
-            const isContentAvailable = selectedChapterIds.length === 0 || availableActivityTypes.includes(activity.key);
+            const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
             return (
               <div
                 key={activity.key}
@@ -561,6 +561,13 @@ export default function PracticePage() {
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
                     <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-200">
                       <Lock size={9} /> Locked
+                    </span>
+                  </div>
+                )}
+                {!activity.is_locked && selectedChapterIds.length === 0 && (
+                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-sky-200">
+                      📚 Select Chapter
                     </span>
                   </div>
                 )}
@@ -596,7 +603,7 @@ export default function PracticePage() {
           {activities.filter(a => a.zone === 'play').map((activity) => {
             const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
             const cardColor = activity.color || '#6366f1';
-            const isContentAvailable = selectedChapterIds.length === 0 || availableActivityTypes.includes(activity.key);
+            const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
             const handleClick = () => {
               if (activity.is_locked) {
                 toast(`${activity.label} is locked 🔒`, 'error');
@@ -626,6 +633,13 @@ export default function PracticePage() {
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
                     <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-200">
                       <Lock size={9} /> Locked
+                    </span>
+                  </div>
+                )}
+                {!activity.is_locked && selectedChapterIds.length === 0 && (
+                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-sky-200">
+                      📚 Select Chapter
                     </span>
                   </div>
                 )}

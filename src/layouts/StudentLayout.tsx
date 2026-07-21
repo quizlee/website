@@ -20,7 +20,6 @@ import { Avatar } from '../components/ui/Avatar';
 import { toast } from '../components/ui/Toast';
 
 const titles = [
-  { xp: 0, title: '🎓 Curious Rookie' },
   { xp: 100, title: '🔍 Fact Finder' },
   { xp: 250, title: '🌿 Seed Sower' },
   { xp: 400, title: '💡 Bright Spark' },
@@ -162,13 +161,14 @@ export default function StudentLayout() {
 
   // Level Logic
   const getLevelFromXP = (totalXP: number) => {
-    if (totalXP < 20) return 1;
-    const level = Math.floor(Math.sqrt(totalXP / 5));
-    return Math.min(level, 100);
+    if (totalXP < 100) return 0;
+    if (totalXP < 200) return Math.min(4, Math.floor(1 + (totalXP - 100) / 25));
+    if (totalXP < 500) return Math.min(9, Math.floor(5 + (totalXP - 200) / 60));
+    return Math.min(100, Math.floor(Math.sqrt(totalXP / 5)));
   };
   const currentLevel = getLevelFromXP(profile?.points || 0);
   const currentTitleObj = [...titles].reverse().find(t => (profile?.points || 0) >= t.xp) || titles[0];
-  const currentTitle = profile?.title || currentTitleObj.title;
+  const currentTitle = profile?.title || '';
 
   const getTodayXPEarned = () => {
     if (!profile) return 0;
@@ -233,7 +233,7 @@ export default function StudentLayout() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Minus icon */}
+              {/* Minus icon - commented out per user request
               <button 
                 onClick={() => handleUpdatePoints(-100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-red-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -241,8 +241,9 @@ export default function StudentLayout() {
               >
                 <Minus size={20} />
               </button>
+              */}
 
-              {/* Plus icon */}
+              {/* Plus icon - commented out per user request
               <button 
                 onClick={() => handleUpdatePoints(100)}
                 className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-green-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
@@ -250,6 +251,7 @@ export default function StudentLayout() {
               >
                 <Plus size={20} />
               </button>
+              */}
 
               {/* Leaderboard icon */}
               <button 
@@ -280,7 +282,7 @@ export default function StudentLayout() {
                 <span>Level {currentLevel}</span>
               </div>
 
-              {/* Daily Quota Indicator & Reset Button */}
+              {/* Daily Quota Indicator & Reset Button - commented out per user request
               {profile && (
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm select-none shrink-0 whitespace-nowrap">
                   <span className="text-slate-500 font-semibold">
@@ -295,6 +297,7 @@ export default function StudentLayout() {
                   </button>
                 </div>
               )}
+              */}
 
               {/* Profile Dropdown */}
               <div className="relative shrink-0" ref={dropdownRef}>
@@ -320,13 +323,15 @@ export default function StudentLayout() {
                       <p className="text-xs text-on-surface-variant font-semibold mt-0.5 truncate leading-none">
                         @{profile?.username || 'username'}
                       </p>
-                      <div className="flex flex-col gap-1.5 mt-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] font-extrabold uppercase text-amber-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full leading-none truncate max-w-full">
-                            {currentTitle}
-                          </span>
+                      {currentTitle && (
+                        <div className="flex flex-col gap-1.5 mt-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-extrabold uppercase text-amber-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full leading-none truncate max-w-full">
+                              {currentTitle}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                     
                     {/* Links */}
