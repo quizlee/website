@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -92,6 +92,87 @@ const getSubjectGradient = (subjectName: string | undefined) => {
   const index = Math.abs(hash) % SUBJECT_GRADIENTS.length;
   return SUBJECT_GRADIENTS[index];
 };
+
+interface ChapterCardProps {
+  chapter: Chapter;
+  idx: number;
+  isSelected: boolean;
+  gradient: typeof SUBJECT_GRADIENTS[0];
+  onToggle: (id: string) => void;
+}
+
+const ChapterCard = memo(function ChapterCard({
+  chapter,
+  idx,
+  isSelected,
+  gradient,
+  onToggle,
+}: ChapterCardProps) {
+  const isLocked = chapter.is_locked;
+  return (
+    <div
+      onClick={() => onToggle(chapter.id)}
+      className={`snap-start w-[190px] h-[130px] rounded-2xl p-3 flex flex-col justify-start select-none transition-all duration-200 flex-shrink-0 relative border-2 ${
+        isLocked
+          ? 'border-slate-200 bg-slate-50/80 text-slate-400 cursor-not-allowed shadow-xs'
+          : isSelected
+          ? gradient.activeBg
+          : `${gradient.lightBg} shadow-md hover:shadow-lg cursor-pointer`
+      }`}
+    >
+      {/* Top row: chapter badge */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-xs transition-all duration-200 ${
+          isLocked
+            ? 'bg-slate-200/60 text-slate-500 border border-slate-300/40'
+            : isSelected 
+            ? `bg-gradient-to-br ${gradient.from} ${gradient.to} text-white border border-transparent` 
+            : 'bg-white text-on-surface-variant border border-surface-200/80'
+        }`}>
+          Chapter {idx + 1}
+        </span>
+      </div>
+
+      {/* Chapter name — top aligned */}
+      <h4 className={`font-headline-sm text-[15px] font-bold leading-snug transition-colors ${
+        isLocked
+          ? 'text-slate-400'
+          : isSelected 
+          ? gradient.textActive 
+          : 'text-on-surface'
+      }`}>
+        {chapter.name}
+      </h4>
+
+      {/* Glassmorphic Lock Overlay */}
+      {isLocked && (
+        <div className="absolute inset-0 bg-slate-100/10 backdrop-blur-[0.5px] rounded-[14px] flex items-center justify-center z-10">
+          <div className="bg-white/95 p-2 rounded-full shadow-md text-slate-500 border border-slate-200 transition-transform duration-200 hover:scale-105">
+            <Lock size={15} />
+          </div>
+        </div>
+      )}
+
+      {/* Active Badge — bottom left */}
+      {!isLocked && chapter.is_active && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white text-emerald-600 border-emerald-200 shadow-sm">
+          🟢 Active
+        </div>
+      )}
+
+      {/* Selection Checkmark / Circle — bottom right */}
+      {!isLocked && (
+        isSelected ? (
+          <div className={`absolute bottom-3 right-3 w-5 h-5 rounded-full flex items-center justify-center shadow-xs text-white bg-gradient-to-br ${gradient.from} ${gradient.to}`}>
+            <Check size={11} strokeWidth={3.5} />
+          </div>
+        ) : (
+          <div className="absolute bottom-3 right-3 w-5 h-5 rounded-full border-2 border-slate-300/80 bg-white/65 transition-all duration-200" />
+        )
+      )}
+    </div>
+  );
+});
 
 export default function PracticePage() {
   const { profile } = useAuthStore();
@@ -255,16 +336,16 @@ export default function PracticePage() {
 
 
   // Toggle a chapter in the inline selection
-  const handleToggleChapter = (chapterId: string) => {
-    const ch = chapters.find((c) => c.id === chapterId);
-    if (ch?.is_locked) {
-      toast('This chapter is locked! 🔒', 'error');
-      return;
-    }
-    setSelectedChapterIds((prev) =>
-      prev.includes(chapterId) ? prev.filter((id) => id !== chapterId) : [...prev, chapterId]
-    );
-  };
+  const handleToggleChapter = useCallback((chapterId: string) => {
+    setSelectedChapterIds((prev) => {
+      const ch = chapters.find((c) => c.id === chapterId);
+      if (ch?.is_locked) {
+        toast('This chapter is locked! 🔒', 'error');
+        return prev;
+      }
+      return prev.includes(chapterId) ? prev.filter((id) => id !== chapterId) : [...prev, chapterId];
+    });
+  }, [chapters]);
 
   // Open modal for a given activity type
   const handleActivityClick = (type: string) => {
@@ -454,74 +535,16 @@ export default function PracticePage() {
                   No chapters found for this subject.
                 </div>
               ) : (
-                chapters.map((ch, idx) => {
-                  const isSelected = selectedChapterIds.includes(ch.id);
-                  const isLocked = ch.is_locked;
-                  return (
-                    <div
-                      key={ch.id}
-                      onClick={() => handleToggleChapter(ch.id)}
-                      className={`snap-start w-[190px] h-[130px] rounded-2xl p-3 flex flex-col justify-start select-none transition-all duration-200 flex-shrink-0 relative border-2 ${
-                        isLocked
-                          ? 'border-slate-200 bg-slate-50/80 text-slate-400 cursor-not-allowed shadow-xs'
-                          : isSelected
-                          ? gradient.activeBg
-                          : `${gradient.lightBg} shadow-md hover:shadow-lg cursor-pointer`
-                      }`}
-                    >
-                      {/* Top row: chapter badge */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-xs transition-all duration-200 ${
-                          isLocked
-                            ? 'bg-slate-200/60 text-slate-500 border border-slate-300/40'
-                            : isSelected 
-                            ? `bg-gradient-to-br ${gradient.from} ${gradient.to} text-white border border-transparent` 
-                            : 'bg-white text-on-surface-variant border border-surface-200/80'
-                        }`}>
-                          Chapter {idx + 1}
-                        </span>
-                      </div>
-
-                      {/* Chapter name — top aligned */}
-                      <h4 className={`font-headline-sm text-[15px] font-bold leading-snug transition-colors ${
-                        isLocked
-                          ? 'text-slate-400'
-                          : isSelected 
-                          ? gradient.textActive 
-                          : 'text-on-surface'
-                      }`}>
-                        {ch.name}
-                      </h4>
-
-                      {/* Glassmorphic Lock Overlay */}
-                      {isLocked && (
-                        <div className="absolute inset-0 bg-slate-100/10 backdrop-blur-[0.5px] rounded-[14px] flex items-center justify-center z-10">
-                          <div className="bg-white/95 p-2 rounded-full shadow-md text-slate-500 border border-slate-200 transition-transform duration-200 hover:scale-105">
-                            <Lock size={15} />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Active Badge — bottom left */}
-                      {!isLocked && ch.is_active && (
-                        <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white text-emerald-600 border-emerald-200 shadow-sm">
-                          🟢 Active
-                        </div>
-                      )}
-
-                      {/* Selection Checkmark / Circle — bottom right */}
-                      {!isLocked && (
-                        isSelected ? (
-                          <div className={`absolute bottom-3 right-3 w-5 h-5 rounded-full flex items-center justify-center shadow-xs text-white bg-gradient-to-br ${gradient.from} ${gradient.to}`}>
-                            <Check size={11} strokeWidth={3.5} />
-                          </div>
-                        ) : (
-                          <div className="absolute bottom-3 right-3 w-5 h-5 rounded-full border-2 border-slate-300/80 bg-white/65 transition-all duration-200" />
-                        )
-                      )}
-                    </div>
-                  );
-                })
+                chapters.map((ch, idx) => (
+                  <ChapterCard
+                    key={ch.id}
+                    chapter={ch}
+                    idx={idx}
+                    isSelected={selectedChapterIds.includes(ch.id)}
+                    gradient={gradient}
+                    onToggle={handleToggleChapter}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -529,7 +552,7 @@ export default function PracticePage() {
       </section>
 
       {/* ── Test Zone (dynamic from DB) ──────────────────────────────── */}
-      <section className="mb-12 pt-6">
+      <section className="mb-12 pt-6 content-lazy">
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Test Zone</h3>
         </div>
@@ -595,7 +618,7 @@ export default function PracticePage() {
       </section>
 
       {/* ── Play Zone (dynamic from DB) ──────────────────────────────── */}
-      <section className="mb-12">
+      <section className="mb-12 content-lazy">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Play Zone</h3>
         </div>
@@ -667,7 +690,7 @@ export default function PracticePage() {
       </section>
 
       {/* Rules & Info */}
-      <section className="w-full">
+      <section className="w-full content-lazy">
         <Card className="flex flex-col justify-between border border-surface-200/60 shadow-xs relative overflow-hidden bg-white">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary-50 rounded-full blur-3xl opacity-60" />
           <div className="relative z-10 space-y-4">

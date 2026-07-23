@@ -107,7 +107,7 @@ export default function StudentLayout() {
     <div className={`min-h-screen ${isPlayPage ? 'bg-white' : 'bg-background'} font-body-md text-on-surface selection:bg-primary-container selection:text-primary relative overflow-x-hidden`}>
       {/* Desktop Header */}
       {!isPlayPage && (
-        <header className="sticky top-0 z-50 bg-white border-b border-surface-100 shadow-sm relative">
+        <header className="sticky top-0 z-50 bg-white border-b border-surface-100 shadow-sm relative gpu-layer">
           <div className="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-4 flex justify-between items-center w-full">
             <div className="flex items-center gap-8">
               <h1 
@@ -279,7 +279,7 @@ export default function StudentLayout() {
 
       {/* Mobile Bottom Navigation */}
       {!isPlayPage && (
-        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 md:hidden bg-white/85 backdrop-blur-2xl rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.06)] border-t border-white/40">
+        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 md:hidden bg-white/95 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.06)] border-t border-white/40 gpu-layer">
           {navItems.map((item) => (
             <NavLink
               key={item.to}

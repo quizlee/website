@@ -298,7 +298,7 @@ export default function StudentHomePage() {
       </section>
 
       {/* Play Zone */}
-      <section className="mb-12">
+      <section className="mb-12 content-lazy">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-extrabold text-on-background">Play Zone</h3>
           <div className="flex items-center gap-3">
@@ -417,7 +417,7 @@ export default function StudentHomePage() {
       </section>
 
       {/* Performance Section */}
-      <section className="mb-12">
+      <section className="mb-12 content-lazy">
         <h3 className="text-2xl font-extrabold text-on-background mb-6">My Stats</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter items-stretch">
           {/* Weekly Goal Card */}
