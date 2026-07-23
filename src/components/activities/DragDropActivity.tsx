@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import type { Content, DragndropPayload, PlayMode } from '../../lib/types';
-import { Check, X, RefreshCw, Trophy, RotateCcw, LogOut } from 'lucide-react';
+import { Check, X, RefreshCw, Trophy, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useNavigate } from 'react-router-dom';
 
