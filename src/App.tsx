@@ -48,6 +48,7 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import AdminLeaderboardPage from './pages/admin/LeaderboardPage';
 import ActivityLogPage from './pages/admin/ActivityLogPage';
 import AdminBulkImportPage from './pages/admin/BulkImportPage';
+import AdminSettingsPage from './pages/admin/SettingsPage';
 
 function RootRedirector() {
   const { user, profile, loading, initialized } = useAuthStore();
@@ -198,6 +199,7 @@ export default function App() {
           <Route path="users" element={<UserManagementPage />} />
           <Route path="leaderboard" element={<AdminLeaderboardPage />} />
           <Route path="activity-log" element={<ActivityLogPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 
         {/* Root Redirect */}

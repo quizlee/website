@@ -63,7 +63,7 @@ export default function ResultPage() {
 
   // Celebration effects
   useEffect(() => {
-    if (percentage >= 70) {
+    if (percentage >= 70 || activityType === 'dragndrop') {
       // Big confetti for good scores
       confetti({
         particleCount: 100,
@@ -72,7 +72,7 @@ export default function ResultPage() {
         colors: ['#5c7cfa', '#f06595', '#20c997', '#fcc419', '#ff6b6b'],
       });
 
-      if (percentage === 100) {
+      if (percentage === 100 || activityType === 'dragndrop') {
         setTimeout(() => {
           confetti({
             particleCount: 50,
@@ -89,7 +89,7 @@ export default function ResultPage() {
         }, 500);
       }
     }
-  }, [percentage]);
+  }, [percentage, activityType]);
 
   const getEmoji = () => {
     if (percentage === 100) return '🏆';

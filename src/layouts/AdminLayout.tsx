@@ -24,6 +24,7 @@ const navItems = [
   { to: '/1234/admin/users', icon: Users, label: 'User Management', end: false },
   { to: '/1234/admin/leaderboard', icon: Trophy, label: 'Leaderboard', end: false },
   { to: '/1234/admin/activity-log', icon: ClipboardList, label: 'Activity Log', end: false },
+  { to: '/1234/admin/settings', icon: Settings, label: 'Settings', end: false },
 ];
 
 export default function AdminLayout() {
