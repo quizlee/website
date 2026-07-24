@@ -314,10 +314,11 @@ export function QuizActivity({
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/student/practice')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 cursor-pointer"
+              className="flex items-center justify-center gap-2 w-10 h-10 sm:w-auto sm:px-5 sm:py-2.5 rounded-full font-bold select-none transition-all text-sm bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 cursor-pointer"
+              title="Quit Quiz"
             >
               <span className="material-symbols-outlined text-base">close</span>
-              Quit Quiz
+              <span className="hidden sm:inline">Quit Quiz</span>
             </button>
 
             {/* Skip Button */}
@@ -351,7 +352,7 @@ export function QuizActivity({
                 <div 
                   key={idx} 
                   className={`h-2 rounded-full transition-all duration-300 ${dotClass}`} 
-                />
+                  />
               );
             })}
           </div>
@@ -362,27 +363,29 @@ export function QuizActivity({
             <button 
               disabled={currentIndex === 0}
               onClick={() => setCurrentIndex(prev => prev - 1)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold select-none transition-all text-sm ${
+              className={`flex items-center justify-center gap-2 w-10 h-10 sm:w-auto sm:px-5 sm:py-2.5 rounded-full font-bold select-none transition-all text-sm ${
                 currentIndex > 0
                   ? 'bg-primary-50 text-primary hover:bg-primary-100 border border-primary-200/60 cursor-pointer shadow-sm shadow-primary-500/5'
                   : 'bg-slate-50 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50'
               }`}
+              title="Previous Question"
             >
               <span className="material-symbols-outlined text-base">navigate_before</span>
-              Previous
+              <span className="hidden sm:inline">Previous</span>
             </button>
 
             {/* Next Button */}
             <button 
               disabled={!isAnswered}
               onClick={handleNext}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm ${
+              className={`flex items-center justify-center gap-2 w-10 h-10 sm:w-auto sm:px-6 sm:py-2.5 rounded-full font-bold select-none transition-all text-sm ${
                 isAnswered 
                   ? 'bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer' 
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
               }`}
+              title={currentIndex + 1 >= total ? 'See Results' : 'Next'}
             >
-              {currentIndex + 1 >= total ? 'See Results' : 'Next'}
+              <span className="hidden sm:inline">{currentIndex + 1 >= total ? 'See Results' : 'Next'}</span>
               <span className="material-symbols-outlined text-base">navigate_next</span>
             </button>
           </div>

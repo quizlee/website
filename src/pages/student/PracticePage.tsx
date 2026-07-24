@@ -112,7 +112,7 @@ const ChapterCard = memo(function ChapterCard({
   return (
     <div
       onClick={() => onToggle(chapter.id)}
-      className={`snap-start w-[190px] h-[130px] rounded-2xl p-3 flex flex-col justify-start select-none transition-all duration-200 flex-shrink-0 relative border-2 ${
+      className={`snap-start w-[145px] sm:w-[190px] h-[130px] rounded-2xl p-3 flex flex-col justify-start select-none transition-all duration-200 flex-shrink-0 relative border-2 ${
         isLocked
           ? 'border-slate-200 bg-slate-50/80 text-slate-400 cursor-not-allowed shadow-xs'
           : isSelected
@@ -134,7 +134,7 @@ const ChapterCard = memo(function ChapterCard({
       </div>
 
       {/* Chapter name — top aligned */}
-      <h4 className={`font-headline-sm text-[15px] font-bold leading-snug transition-colors ${
+      <h4 className={`font-headline-sm text-[13px] sm:text-[15px] font-bold leading-snug transition-colors ${
         isLocked
           ? 'text-slate-400'
           : isSelected 
@@ -408,7 +408,7 @@ export default function PracticePage() {
     <div className="animate-fade-in space-y-6">
 
       {/* Header Block / Instructions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div className="hidden sm:flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-surface-900 tracking-tight flex items-center gap-2">
             Practice Arena <BookOpen className="text-primary-500 fill-primary-100 animate-pulse" size={28} />
@@ -417,54 +417,50 @@ export default function PracticePage() {
             Pick a subject, select your chapters, and start any activity below to test your knowledge!
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-primary-50 border border-primary-100 text-primary-700 px-4 py-2 rounded-2xl text-sm font-bold shadow-xs select-none">
-          <Sparkles size={16} className="text-primary fill-primary-200" />
-          <span>Learn at your own pace</span>
-        </div>
       </div>
 
       {/* ── Subject + Chapter Selector ─────────────────────────────── */}
       <section className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter items-stretch">
+        <div className="flex flex-row md:grid md:grid-cols-12 gap-gutter items-stretch">
 
           {/* Left: Subject Card — stretched to match right column height */}
-          <div className="md:col-span-3 flex flex-col min-h-[170px]">
-            <div className={`relative rounded-3xl overflow-hidden h-full flex flex-col p-5 bg-gradient-to-br ${gradient.from} ${gradient.to} shadow-xl ${gradient.shadow}`}>
+          <div className="w-[120px] sm:w-[130px] md:w-auto md:col-span-3 flex flex-col flex-shrink-0 min-h-[130px] md:min-h-[170px] mb-5">
+            <div className={`relative rounded-3xl overflow-hidden h-full flex flex-col p-3 md:p-5 bg-gradient-to-br ${gradient.from} ${gradient.to} shadow-xl ${gradient.shadow}`}>
               {/* Decorative blobs */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none hidden md:block" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none hidden md:block" />
 
               {loadingSubjects ? (
                 <div className="relative z-10 flex items-center gap-2 text-white/70">
                   <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  <span className="text-sm font-semibold">Loading…</span>
+                  <span className="text-xs font-semibold">Loading…</span>
                 </div>
               ) : subjects.length === 0 ? (
                 <p className="relative z-10 text-white/80 text-sm font-semibold">No subjects found</p>
               ) : (
                 <>
                   {/* Badge + title + count — all top-left */}
-                  <div className="relative z-10 flex flex-col gap-1">
-                    <div className="inline-flex items-center bg-white/20 backdrop-blur-sm text-white/90 px-3 py-1 rounded-full text-xs font-bold border border-white/20 self-start">
+                  <div className="relative z-10 flex flex-col gap-0.5 md:gap-1">
+                    <div className="inline-flex items-center bg-white/20 backdrop-blur-sm text-white/90 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-white/20 self-start">
                       SUBJECT
                     </div>
-                    <h2 className="font-headline-md text-headline-sm text-white font-bold leading-tight mt-1">
+                    <h2 className="font-headline-md text-xs sm:text-sm md:text-headline-sm text-white font-bold leading-tight mt-0.5 md:mt-1 truncate w-full" title={selectedSubject?.name}>
                       {selectedSubject?.name ?? '—'}
                     </h2>
-                    <div className="flex items-center gap-1.5 text-white/80 text-xs font-semibold">
-                      <span className="material-symbols-outlined text-[14px]">menu_book</span>
-                      {loadingChapters ? 'Loading…' : `${chapters.length} Chapter${chapters.length !== 1 ? 's' : ''}`}
+                    <div className="flex items-center gap-1 text-white/80 text-[10px] md:text-xs font-semibold">
+                      <span className="material-symbols-outlined text-[12px] md:text-[14px]">menu_book</span>
+                      <span className="truncate">{loadingChapters ? 'Loading…' : `${chapters.length} Ch`}</span>
                     </div>
                   </div>
 
                   {/* Dropdown — pushed to bottom and right-aligned */}
                   <div className="relative z-10 mt-auto flex justify-end">
                     {subjects.length > 1 && (
-                      <div className="relative">
+                      <div className="relative w-full">
                         <select
                           value={selectedSubjectIdx}
                           onChange={(e) => setSelectedSubjectIdx(Number(e.target.value))}
-                          className="appearance-none bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold font-label-md text-xs pl-4 pr-8 py-1.5 rounded-full cursor-pointer hover:bg-white/30 transition-all focus:outline-none shadow-sm"
+                          className="appearance-none w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold font-label-md text-[10px] md:text-xs pl-2 md:pl-4 pr-5 md:pr-8 py-1 md:py-1.5 rounded-full cursor-pointer hover:bg-white/30 transition-all focus:outline-none shadow-sm text-ellipsis overflow-hidden whitespace-nowrap"
                         >
                           {subjects.map((sub, i) => (
                             <option key={sub.id} value={i} className="text-on-background bg-white font-semibold">
@@ -472,8 +468,8 @@ export default function PracticePage() {
                             </option>
                           ))}
                         </select>
-                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-white">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <span className="pointer-events-none absolute right-1.5 md:right-2.5 top-1/2 -translate-y-1/2 text-white">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" className="md:w-3 md:h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="6 9 12 15 18 9" />
                           </svg>
                         </span>
@@ -486,9 +482,9 @@ export default function PracticePage() {
           </div>
 
           {/* Right: Chapter Cards */}
-          <div className="md:col-span-9 flex flex-col gap-3">
+          <div className="flex-grow min-w-0 md:col-span-9 flex flex-col gap-3">
             <div className="flex items-center justify-between px-1">
-              <div>
+              <div className="hidden sm:block">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant select-none">
                   {selectedChapterIds.length === 0
                     ? 'Select Chapters to Practice'
@@ -496,24 +492,24 @@ export default function PracticePage() {
                   }
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 {selectedChapterIds.length > 0 && (
                   <button
                     onClick={() => setSelectedChapterIds([])}
-                    className="text-xs text-on-surface-variant hover:text-primary font-bold transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-surface-container-low"
+                    className="hidden sm:inline-block text-xs text-on-surface-variant hover:text-primary font-bold transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-surface-container-low"
                   >
                     Clear all
                   </button>
                 )}
                 <button
                   onClick={() => scrollChapters('left')}
-                  className="w-8 h-8 rounded-full bg-white border border-surface-200 shadow-sm flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+                  className="flex w-8 h-8 rounded-full bg-white border border-surface-200 shadow-sm items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
                 >
                   <ChevronLeft size={15} />
                 </button>
                 <button
                   onClick={() => scrollChapters('right')}
-                  className="w-8 h-8 rounded-full bg-white border border-surface-200 shadow-sm flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+                  className="flex w-8 h-8 rounded-full bg-white border border-surface-200 shadow-sm items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
                 >
                   <ChevronRight size={15} />
                 </button>
@@ -528,7 +524,7 @@ export default function PracticePage() {
             >
               {loadingChapters ? (
                 Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="snap-start min-w-[190px] h-[130px] bg-surface-container-low rounded-2xl animate-pulse flex-shrink-0" />
+                  <div key={i} className="snap-start w-[145px] sm:w-[190px] h-[130px] bg-surface-container-low rounded-2xl animate-pulse flex-shrink-0" />
                 ))
               ) : chapters.length === 0 ? (
                 <div className="flex items-center justify-center w-full h-[130px] text-on-surface-variant text-sm font-semibold">
@@ -552,11 +548,11 @@ export default function PracticePage() {
       </section>
 
       {/* ── Test Zone (dynamic from DB) ──────────────────────────────── */}
-      <section className="mb-12 pt-6 content-lazy">
+      <section className="mb-12 pt-2">
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Test Zone</h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
           {activities.filter(a => a.zone === 'test').map((activity) => {
             const cardColor = activity.color || '#6366f1';
             const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
@@ -578,7 +574,7 @@ export default function PracticePage() {
                   }
                   handleComingSoonClick(activity.label);
                 }}
-                className={`bg-white rounded-2xl p-5 bouncy cursor-pointer group border-surface-200 shadow-md relative flex items-start gap-4 h-full ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
+                className={`bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border-surface-200 shadow-md relative flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
               >
                 {activity.is_locked && (
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
@@ -602,14 +598,14 @@ export default function PracticePage() {
                   </div>
                 )}
                 <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-center text-3xl"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
                   style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
                 >
                   {activity.emoji || '📄'}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-base sm:text-lg">{activity.label}</h4>
-                  <p className="text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
+                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
                 </div>
               </div>
             );
@@ -618,11 +614,11 @@ export default function PracticePage() {
       </section>
 
       {/* ── Play Zone (dynamic from DB) ──────────────────────────────── */}
-      <section className="mb-12 content-lazy">
+      <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Play Zone</h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
           {activities.filter(a => a.zone === 'play').map((activity) => {
             const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
             const cardColor = activity.color || '#6366f1';
@@ -650,7 +646,7 @@ export default function PracticePage() {
               <div
                 key={activity.key}
                 onClick={handleClick}
-                className={`bg-white rounded-2xl p-5 bouncy cursor-pointer group border-surface-200 shadow-md flex items-start gap-4 h-full relative ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
+                className={`bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border-surface-200 shadow-md flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full relative ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
               >
                 {activity.is_locked && (
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
@@ -674,14 +670,14 @@ export default function PracticePage() {
                   </div>
                 )}
                 <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-center text-3xl drop-shadow-md"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl drop-shadow-md"
                   style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
                 >
                   {activity.emoji || '🎮'}
                 </div>
                 <div className="flex-grow">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-base sm:text-lg">{activity.label}</h4>
-                  <p className="text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
+                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
                 </div>
               </div>
             );
@@ -690,7 +686,7 @@ export default function PracticePage() {
       </section>
 
       {/* Rules & Info */}
-      <section className="w-full content-lazy">
+      <section className="w-full">
         <Card className="flex flex-col justify-between border border-surface-200/60 shadow-xs relative overflow-hidden bg-white">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary-50 rounded-full blur-3xl opacity-60" />
           <div className="relative z-10 space-y-4">

@@ -179,7 +179,7 @@ export default function StudentLayout() {
               {/* Level Display */}
               <div 
                 onClick={() => navigate('/student/settings', { state: { tab: 'level' } })}
-                className="flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100/70 text-primary px-3 py-1.5 rounded-full border border-primary-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
+                className="hidden sm:flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100/70 text-primary px-3 py-1.5 rounded-full border border-primary-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
                 title="Current Level"
               >
                 <Award size={14} className="text-primary fill-primary/10" />

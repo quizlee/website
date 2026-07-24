@@ -27,6 +27,7 @@ export function DragDropActivity({
   // Selections state: { [questionIndex]: { [blankIndex]: Chip } }
   const [selections, setSelections] = useState<Record<number, Record<number, Chip>>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showCorrectAnswers, setShowCorrectAnswers] = useState(false);
   const [selectedDockChip, setSelectedDockChip] = useState<Chip | null>(null);
   
   // Custom Drag & Drop states
@@ -78,6 +79,7 @@ export function DragDropActivity({
     setAllChips(shuffled);
     setSelections({});
     setIsSubmitted(false);
+    setShowCorrectAnswers(false);
     setSelectedDockChip(null);
     setDraggedChip(null);
     setDragCoords(null);
@@ -284,7 +286,7 @@ export function DragDropActivity({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in relative pb-36">
+    <div className="flex flex-col gap-6 animate-fade-in relative pb-60">
 
       {/* Main Question List */}
       <div className="flex flex-col gap-4">
@@ -305,6 +307,7 @@ export function DragDropActivity({
                   
                   const correctText = q.correctAnswers[blankIndex];
                   const isCorrect = placedChip?.text === correctText;
+                  const shouldShowCorrect = showCorrectAnswers && isSubmitted && !isCorrect;
 
                   // Border and background state styling for blanks
                   let blankStyle = "border-dashed border-2 border-slate-300 bg-slate-50/50 hover:border-primary-400 hover:bg-primary-50/20 shadow-inner";
@@ -316,7 +319,10 @@ export function DragDropActivity({
                     blankStyle = "border-dashed border-2 border-slate-300 bg-slate-50/50 shadow-inner";
                     textColor = "text-transparent";
                   } else if (isSubmitted) {
-                    if (!hasValue) {
+                    if (shouldShowCorrect) {
+                      blankStyle = "border-[#ff6b6b] bg-white border-2 shadow-sm";
+                      textColor = "text-slate-700";
+                    } else if (!hasValue) {
                       blankStyle = "border-amber-400 bg-amber-50/40 animate-pulse border-2 shadow-inner";
                     } else if (isCorrect) {
                       blankStyle = "border-[#4cd171] bg-[#effff2] shadow-sm border-2";
@@ -359,11 +365,11 @@ export function DragDropActivity({
                           `}
                           title={hasValue ? "Click or drag to return word to dock" : "Drop answer here"}
                         >
-                          {hasValue ? (
+                          {(hasValue || shouldShowCorrect) ? (
                             <span className={`flex items-center gap-1.5 ${textColor}`}>
-                              {placedChip.text}
+                              {shouldShowCorrect ? correctText : placedChip?.text}
                               {isSubmitted && isCorrect && <Check size={14} className="text-[#4cd171] shrink-0" />}
-                              {isSubmitted && !isCorrect && <X size={14} className="text-[#ff6b6b] shrink-0" />}
+                              {isSubmitted && !isCorrect && !shouldShowCorrect && <X size={14} className="text-[#ff6b6b] shrink-0" />}
                             </span>
                           ) : null}
                         </span>
@@ -383,7 +389,7 @@ export function DragDropActivity({
           variant="outline"
           size="lg"
           onClick={() => navigate('/student/practice')}
-          className="flex items-center gap-1.5 px-8 font-bold border-2 border-slate-200 text-slate-500 hover:bg-slate-50"
+          className="flex items-center gap-1.5 px-4 sm:px-8 py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-xl sm:rounded-2xl font-bold border-2 border-slate-200 text-slate-500 hover:bg-slate-50"
         >
           <LogOut size={16} />
           Quit
@@ -393,7 +399,7 @@ export function DragDropActivity({
           <Button
             size="lg"
             onClick={handleSubmit}
-            className="px-10 font-bold bouncy shadow-lg hover:shadow-primary/20"
+            className="px-5 sm:px-10 py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-xl sm:rounded-2xl font-bold bouncy shadow-lg hover:shadow-primary/20"
             disabled={getAnsweredCount() === 0}
           >
             Submit Answers 🚀
@@ -402,7 +408,7 @@ export function DragDropActivity({
           <Button
             size="lg"
             onClick={handleFinish}
-            className="px-10 font-bold bouncy shadow-lg hover:shadow-success/20 bg-success text-white hover:bg-success/90"
+            className="px-5 sm:px-10 py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-xl sm:rounded-2xl font-bold bouncy shadow-lg hover:shadow-success/20 bg-success text-white hover:bg-success/90"
           >
             Show Result ➜
           </Button>
@@ -437,7 +443,7 @@ export function DragDropActivity({
           </div>
 
           {/* Row 2: Draggable answer chips below */}
-          <div className="flex-grow flex flex-wrap gap-2 justify-center md:justify-start overflow-y-auto max-h-[90px] pl-2 w-full">
+          <div className="flex-grow flex flex-wrap gap-2 justify-center md:justify-start overflow-y-auto max-h-[160px] pl-2 w-full">
             {availableChips.length === 0 ? (
               <p className="text-xs text-slate-500 font-medium italic">All words placed. Click on words above to return them here.</p>
             ) : (
@@ -493,6 +499,17 @@ export function DragDropActivity({
               </p>
             </div>
           </div>
+          
+          <button
+            onClick={() => setShowCorrectAnswers(!showCorrectAnswers)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-150 cursor-pointer shrink-0 ${
+              showCorrectAnswers
+                ? 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300 hover:border-slate-400 shadow-sm'
+                : 'bg-white hover:bg-success-50/50 text-success-700 border-success-200 hover:border-success-300 shadow-xs'
+            }`}
+          >
+            {showCorrectAnswers ? 'Hide' : 'Show'}
+          </button>
         </div>
       )}
 

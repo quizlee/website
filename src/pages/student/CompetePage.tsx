@@ -260,7 +260,7 @@ export default function CompetePage() {
       <div className="space-y-6">
         {/* Header Block */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
+          <div className="hidden sm:block">
             <h1 className="text-3xl font-extrabold text-surface-900 tracking-tight flex items-center gap-2">
               Compete Arena <Trophy className="text-warning-500 fill-warning-100 animate-pulse" size={28} />
             </h1>

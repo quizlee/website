@@ -298,7 +298,7 @@ export default function StudentHomePage() {
       </section>
 
       {/* Play Zone */}
-      <section className="mb-12 content-lazy">
+      <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-extrabold text-on-background">Play Zone</h3>
           <div className="flex items-center gap-3">
@@ -347,7 +347,7 @@ export default function StudentHomePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
           {activities.map((activity) => {
             const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
             const isContentAvailable = selectedSubject ? availableActivityTypes.includes(activity.key) : false;
@@ -377,7 +377,7 @@ export default function StudentHomePage() {
               <div
                 key={activity.key}
                 onClick={handleClick}
-                className={`bg-white rounded-2xl p-5 bouncy cursor-pointer group border-surface-200 shadow-md flex items-start gap-4 h-full relative ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
+                className={`bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border-surface-200 shadow-md flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full relative ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
               >
                 {activity.is_locked && (
                   <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
@@ -401,14 +401,14 @@ export default function StudentHomePage() {
                   </div>
                 )}
                 <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-center text-3xl drop-shadow-md"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl drop-shadow-md"
                   style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
                 >
                   {activity.emoji || '🎮'}
                 </div>
                 <div className="flex-grow">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-base sm:text-lg">{activity.label}</h4>
-                  <p className="text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
+                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
                 </div>
               </div>
             );
