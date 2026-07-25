@@ -6,8 +6,11 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { toast } from '../../components/ui/Toast';
+import { Select } from '../../components/ui/Select';
 
-import { Camera, Save, BookOpen, ShieldCheck, Trash2 } from 'lucide-react';
+import { Avatar } from '../../components/ui/Avatar';
+
+import { Camera, Save, ShieldCheck, Trash2, Loader2, Check, X } from 'lucide-react';
 
 export default function TeacherAccountPage() {
   const { profile, user, setProfile } = useAuthStore();
@@ -15,6 +18,117 @@ export default function TeacherAccountPage() {
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [username, setUsername] = useState(profile?.username || '');
   const [schoolName, setSchoolName] = useState('Loading...');
+  const [schools, setSchools] = useState<any[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState(profile?.school_id || '');
+
+  useEffect(() => {
+    async function fetchSchools() {
+      const { data } = await supabase
+        .from('schools')
+        .select('id, name')
+        .eq('status', 'active')
+        .order('name');
+      if (data) {
+        setSchools(data);
+      }
+    }
+    fetchSchools();
+  }, []);
+
+  useEffect(() => {
+    if (profile?.school_id) {
+      setSelectedSchoolId(profile.school_id);
+    } else {
+      setSelectedSchoolId('');
+    }
+  }, [profile?.school_id]);
+
+  // Student-Teacher Relations state
+  const [studentRelations, setStudentRelations] = useState<any[]>([]);
+  const [fetchingRelations, setFetchingRelations] = useState(false);
+
+  const fetchStudentRelations = async () => {
+    if (!profile?.id) return;
+    setFetchingRelations(true);
+    try {
+      // 1. Fetch relations
+      const { data: relations, error: relError } = await supabase
+        .from('student_teacher_relations')
+        .select('*')
+        .eq('teacher_id', profile.id);
+
+      if (relError) throw relError;
+
+      // 2. Fetch profiles for these students
+      if (relations && relations.length > 0) {
+        const studentIds = relations.map(r => r.student_id);
+        const { data: studentProfiles, error: profError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', studentIds);
+
+        if (profError) throw profError;
+
+        const relationsWithProfiles = relations.map(r => {
+          const prof = studentProfiles?.find(p => p.id === r.student_id);
+          return {
+            id: r.id,
+            status: r.status,
+            student_id: r.student_id,
+            student: prof || null
+          };
+        });
+        setStudentRelations(relationsWithProfiles);
+      } else {
+        setStudentRelations([]);
+      }
+    } catch (err) {
+      console.error('Error fetching student relations:', err);
+    } finally {
+      setFetchingRelations(false);
+    }
+  };
+
+  const handleUpdateRelationStatus = async (relationId: string, newStatus: 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('student_teacher_relations')
+        .update({ status: newStatus })
+        .eq('id', relationId);
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        toast(`Request ${newStatus === 'approved' ? 'approved' : 'declined'} successfully!`, 'success');
+        fetchStudentRelations();
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
+  };
+
+  const handleDisconnectStudent = async (relationId: string) => {
+    if (!confirm('Are you sure you want to disconnect this student?')) return;
+    try {
+      const { error } = await supabase
+        .from('student_teacher_relations')
+        .delete()
+        .eq('id', relationId);
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        toast('Student disconnected.', 'success');
+        fetchStudentRelations();
+      }
+    } catch (err) {
+      console.error('Error deleting relation:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStudentRelations();
+  }, [profile]);
 
   useEffect(() => {
     async function fetchSchool() {
@@ -45,13 +159,14 @@ export default function TeacherAccountPage() {
       .update({
         full_name: fullName,
         username,
+        school_id: selectedSchoolId || null,
       })
       .eq('id', profile.id);
 
     if (error) {
       toast(error.message, 'error');
     } else {
-      setProfile({ ...profile, full_name: fullName, username });
+      setProfile({ ...profile, full_name: fullName, username, school_id: selectedSchoolId || null });
       toast('Profile updated! 🎉', 'success');
     }
     setLoading(false);
@@ -142,17 +257,17 @@ export default function TeacherAccountPage() {
         {/* Left Column - Avatar, Affiliation & Claimed Subjects */}
         <div className="md:col-span-1 flex flex-col gap-6">
           {/* Avatar / Logo Card */}
-          <Card>
-            <div className="flex items-center gap-6">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-secondary-100 flex items-center justify-center text-3xl font-bold text-secondary-600 overflow-hidden">
+          <Card className="text-center">
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4">
+                <div className="w-24 h-24 rounded-full bg-secondary-100 flex items-center justify-center text-4xl font-bold text-secondary-600 overflow-hidden shadow-inner">
                   {profile?.avatar_url ? (
                     <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     profile?.full_name?.[0]?.toUpperCase() || '?'
                   )}
                 </div>
-                <label className="absolute -bottom-1 -right-1 w-8 h-8 bg-secondary-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-secondary-600 transition-colors">
+                <label className="absolute bottom-0 right-0 w-8 h-8 bg-secondary-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-secondary-600 transition-colors">
                   <Camera size={14} className="text-white" />
                   <input
                     type="file"
@@ -162,20 +277,20 @@ export default function TeacherAccountPage() {
                   />
                 </label>
               </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-bold text-surface-900">{profile?.full_name || 'Teacher'}</h3>
+              <div className="flex flex-col items-center w-full">
+                <h3 className="font-extrabold text-surface-900 leading-snug">{profile?.full_name || 'Teacher'}</h3>
+                <div className="mt-2 mb-3">
                   {getVerificationBadge()}
                 </div>
-                <p className="text-sm text-surface-500">@{profile?.username || 'username'}</p>
+                <p className="text-sm text-surface-500 font-semibold">@{profile?.username || 'username'}</p>
                 {user?.email && (
-                  <p className="text-xs text-surface-400 mt-0.5">{user.email}</p>
+                  <p className="text-xs text-surface-400 mt-1 truncate max-w-full">{user.email}</p>
                 )}
                 <p className="text-xs text-surface-400 mt-1">School ID: {profile?.school_id || 'Global'}</p>
                 {profile?.avatar_url && (
                   <button
                     onClick={handleRemoveAvatar}
-                    className="text-xs text-danger-600 hover:text-danger-700 hover:underline font-semibold mt-2 flex items-center gap-1 transition-colors"
+                    className="text-xs text-danger-600 hover:text-danger-700 hover:underline font-semibold mt-3.5 flex items-center gap-1.5 transition-colors mx-auto"
                   >
                     <Trash2 size={12} /> Remove picture
                   </button>
@@ -195,22 +310,7 @@ export default function TeacherAccountPage() {
             </div>
           </Card>
 
-          {/* Claimed Subjects */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen size={18} className="text-secondary-600" />
-              <h3 className="font-bold text-surface-900">Claimed Subjects</h3>
-            </div>
-            {profile?.subjects_claimed && profile.subjects_claimed.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {profile.subjects_claimed.map((sub, i) => (
-                  <Badge key={i} variant="info">{sub}</Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-surface-400">No subjects registered yet.</p>
-            )}
-          </Card>
+
         </div>
 
         {/* Right Column - Profile Form & Save */}
@@ -229,6 +329,18 @@ export default function TeacherAccountPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
+              <Select
+                label="School"
+                value={selectedSchoolId}
+                onChange={(e) => setSelectedSchoolId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select School' },
+                  ...schools.map((school) => ({
+                    value: school.id,
+                    label: school.name,
+                  })),
+                ]}
+              />
             </div>
           </Card>
 
@@ -241,6 +353,135 @@ export default function TeacherAccountPage() {
           >
             Save Changes
           </Button>
+
+          {/* Student Requests Section */}
+          <Card>
+            <div className="flex items-center gap-2 mb-4 border-b border-surface-100 pb-3">
+              <span className="text-xl">🎓</span>
+              <h3 className="font-bold text-surface-900 font-headline-sm">Student Requests</h3>
+            </div>
+
+            {fetchingRelations ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-5 h-5 text-secondary-500 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {studentRelations.filter(r => r.status === 'pending').length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {studentRelations.filter(r => r.status === 'pending').map((relation) => {
+                      const initials = relation.student?.full_name?.[0]?.toUpperCase() || '?';
+                      return (
+                        <div 
+                          key={relation.id}
+                          className="flex items-center justify-between p-3.5 bg-surface-50 border border-surface-200 rounded-2xl"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar
+                              avatarUrl={relation.student?.avatar_url || null}
+                              initials={initials}
+                              className="w-10 h-10 border border-white text-sm font-bold bg-primary-50 text-primary-700"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-surface-900 truncate">
+                                {relation.student?.full_name || 'Student'}
+                              </p>
+                              <p className="text-xs text-surface-450 truncate">
+                                @{relation.student?.username || 'username'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleUpdateRelationStatus(relation.id, 'approved')}
+                              className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                            >
+                              <Check size={14} /> Accept
+                            </button>
+                            <button
+                              onClick={() => handleUpdateRelationStatus(relation.id, 'rejected')}
+                              className="p-1.5 text-danger-600 hover:bg-danger-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-danger-200"
+                              title="Decline"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-surface-450 text-center py-2 font-medium">
+                    No pending connection requests from students.
+                  </p>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* My Students Section */}
+          <Card>
+            <div className="flex items-center gap-2 mb-4 border-b border-surface-100 pb-3">
+              <span className="text-xl">👥</span>
+              <h3 className="font-bold text-surface-900 font-headline-sm">My Connected Students</h3>
+            </div>
+
+            {fetchingRelations ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-5 h-5 text-secondary-500 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {studentRelations.filter(r => r.status === 'approved').length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {studentRelations.filter(r => r.status === 'approved').map((relation) => {
+                      const initials = relation.student?.full_name?.[0]?.toUpperCase() || '?';
+                      return (
+                        <div 
+                          key={relation.id}
+                          className="flex items-center justify-between p-3.5 bg-surface-50 border border-surface-200 rounded-2xl"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar
+                              avatarUrl={relation.student?.avatar_url || null}
+                              initials={initials}
+                              className="w-10 h-10 border border-white text-sm font-bold bg-primary-50 text-primary-700"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-surface-900 truncate">
+                                {relation.student?.full_name || 'Student'}
+                              </p>
+                              <p className="text-xs text-surface-450 truncate">
+                                @{relation.student?.username || 'username'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                              {relation.student?.points || 0} XP
+                            </span>
+                            <button
+                              onClick={() => handleDisconnectStudent(relation.id)}
+                              className="p-1 text-danger hover:bg-danger-50 rounded-lg transition-colors cursor-pointer"
+                              title="Remove Student"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-surface-450 text-center py-2 font-medium">
+                    No connected students yet.
+                  </p>
+                )}
+              </div>
+            )}
+          </Card>
         </div>
       </div>
     </div>

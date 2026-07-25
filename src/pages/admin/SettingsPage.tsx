@@ -138,7 +138,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="animate-fade-in max-w-6xl mx-auto pb-12">
       {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-surface-200 pb-5">
+      <div className="hidden md:flex mb-6 flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-surface-200 pb-5">
         <div>
           <h1 className="text-2xl font-black text-surface-900 font-headline-md flex items-center gap-2.5">
             <Settings size={26} className="text-primary-600" />

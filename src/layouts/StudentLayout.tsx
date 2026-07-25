@@ -6,22 +6,17 @@ import {
   Home,
   BookOpen,
   Trophy,
-  Clock,
   LogOut,
   ChevronDown,
   Star,
   Settings,
   Award,
   User,
+  Users,
+  Medal,
+  GraduationCap,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
-
-const navItems = [
-  { to: '/student', icon: Home, label: 'Home', end: true },
-  { to: '/student/practice', icon: BookOpen, label: 'Practice', end: false },
-  { to: '/student/compete', icon: Trophy, label: 'Compete', end: false },
-  { to: '/student/history', icon: Clock, label: 'Recent', end: false },
-];
 
 export default function StudentLayout() {
   const { profile } = useAuthStore();
@@ -29,6 +24,34 @@ export default function StudentLayout() {
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [hasConnectedTeacher, setHasConnectedTeacher] = useState(false);
+
+  useEffect(() => {
+    async function checkTeacherConnection() {
+      if (!profile?.id) return;
+      const { data } = await supabase
+        .from('student_teacher_relations')
+        .select('id')
+        .eq('student_id', profile.id)
+        .eq('status', 'approved')
+        .limit(1);
+
+      if (data && data.length > 0) {
+        setHasConnectedTeacher(true);
+      } else {
+        setHasConnectedTeacher(false);
+      }
+    }
+    checkTeacherConnection();
+  }, [profile?.id]);
+
+  const dynamicNavItems = [
+    { to: '/student', icon: Home, label: 'Home', end: true },
+    { to: '/student/practice', icon: BookOpen, label: 'Practice', end: false },
+    { to: '/student/compete', icon: Trophy, label: 'Compete', end: false },
+    ...(hasConnectedTeacher ? [{ to: '/student/class-activities', icon: GraduationCap, label: 'Classroom', end: false }] : []),
+    { to: '/student/leaderboard', icon: Medal, label: 'Leaderboard', end: false },
+  ];
 
   const isPlayPage = location.pathname === '/student/play';
 
@@ -116,8 +139,8 @@ export default function StudentLayout() {
               >
                 Quizlee
               </h1>
-              <nav className="hidden md:flex gap-6 items-end">
-                {navItems.map((item) => (
+              <nav className="hidden lg:flex gap-6 items-end">
+                {dynamicNavItems.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -157,14 +180,16 @@ export default function StudentLayout() {
               </button>
               */}
 
-              {/* Leaderboard icon */}
+              {/* Friends icon */}
               <button 
-                onClick={() => navigate('/student/leaderboard')}
+                onClick={() => navigate('/student/friends')}
                 className="p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
-                title="Leaderboard"
+                title="Friends & Classmates"
               >
-                <Trophy size={20} />
+                <Users size={20} />
               </button>
+
+
 
               {/* XP Count with Star Icon */}
               <div 
@@ -179,11 +204,14 @@ export default function StudentLayout() {
               {/* Level Display */}
               <div 
                 onClick={() => navigate('/student/settings', { state: { tab: 'level' } })}
-                className="hidden sm:flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100/70 text-primary px-3 py-1.5 rounded-full border border-primary-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
+                className="flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100/70 text-primary px-3 py-1.5 rounded-full border border-primary-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
                 title="Current Level"
               >
                 <Award size={14} className="text-primary fill-primary/10" />
-                <span>Level {currentLevel}</span>
+                <span>
+                  <span className="hidden sm:inline">Level </span>
+                  {currentLevel}
+                </span>
               </div>
 
               {/* Daily Quota Indicator & Reset Button - commented out per user request
@@ -279,8 +307,8 @@ export default function StudentLayout() {
 
       {/* Mobile Bottom Navigation */}
       {!isPlayPage && (
-        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 md:hidden bg-white/95 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.06)] border-t border-white/40 gpu-layer">
-          {navItems.map((item) => (
+        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 lg:hidden bg-white/95 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.06)] border-t border-white/40 gpu-layer">
+          {dynamicNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

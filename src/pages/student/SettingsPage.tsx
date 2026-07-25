@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
-import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown, Plus } from 'lucide-react';
+import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown, Plus, UserPlus, Clock, Target } from 'lucide-react';
 import { themes, getSavedTheme, saveTheme } from '../../lib/theme';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../../components/ui/Avatar';
@@ -72,14 +72,14 @@ const titles = [
 ];
 
 interface SettingsPageProps {
-  defaultTab?: 'account' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version';
+  defaultTab?: 'account' | 'recent' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version';
 }
 
-export default function SettingsPage({ defaultTab = 'account' }: SettingsPageProps) {
+export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPageProps) {
   const { profile, user, setProfile } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'account' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version'>(() => {
+  const [activeTab, setActiveTab] = useState<'account' | 'recent' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version'>(() => {
     if (location.state?.tab) {
       return location.state.tab;
     }
@@ -192,6 +192,192 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
       return next;
     });
   };
+
+  // Recent Activities state
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [loadingAttempts, setLoadingAttempts] = useState(true);
+
+  // Student-Teacher Connection state
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [allSchoolTeachers, setAllSchoolTeachers] = useState<any[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
+  const [fetchingTeachers, setFetchingTeachers] = useState(false);
+  const [requestingTeacher, setRequestingTeacher] = useState(false);
+
+  const fetchStudentTeachers = async () => {
+    if (!profile?.id) return;
+    setFetchingTeachers(true);
+    try {
+      // 1. Fetch current student-teacher relations
+      const { data: relations, error: relError } = await supabase
+        .from('student_teacher_relations')
+        .select('*')
+        .eq('student_id', profile.id);
+
+      if (relError) throw relError;
+
+      // 2. Fetch profiles for these relations
+      let relationsWithProfiles: any[] = [];
+      if (relations && relations.length > 0) {
+        const teacherIds = relations.map(r => r.teacher_id);
+        const { data: teacherProfiles, error: profError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', teacherIds);
+
+        if (profError) throw profError;
+
+        relationsWithProfiles = relations.map(r => {
+          const prof = teacherProfiles?.find(p => p.id === r.teacher_id);
+          return {
+            id: r.id,
+            status: r.status,
+            teacher_id: r.teacher_id,
+            teacher: prof || null
+          };
+        });
+      }
+
+      setTeachers(relationsWithProfiles);
+
+      // 3. Fetch all verified teachers across all schools
+      const { data: schoolTeachers, error: schoolTeachError } = await supabase
+        .from('profiles')
+        .select('*, schools(name)')
+        .eq('role', 'teacher')
+        .eq('verification_status', 'approved');
+
+      if (schoolTeachError) throw schoolTeachError;
+
+      // Filter out teachers who are already requested or connected
+      const existingTeacherIds = relations?.map(r => r.teacher_id) || [];
+      const available = schoolTeachers?.filter((t: any) => !existingTeacherIds.includes(t.id)) || [];
+
+      setAllSchoolTeachers(available);
+      if (available.length > 0) {
+        setSelectedTeacherId(available[0].id);
+      } else {
+        setSelectedTeacherId('');
+      }
+    } catch (err) {
+      console.error('Error fetching student-teacher data:', err);
+    } finally {
+      setFetchingTeachers(false);
+    }
+  };
+
+  const handleSendTeacherRequest = async (teacherId?: string) => {
+    const targetId = teacherId || selectedTeacherId;
+    if (!profile?.id || !targetId) return;
+    setSelectedTeacherId(targetId);
+    setRequestingTeacher(true);
+    try {
+      const { error } = await supabase
+        .from('student_teacher_relations')
+        .insert({
+          student_id: profile.id,
+          teacher_id: targetId,
+          status: 'pending'
+        });
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        toast('Connection request sent to teacher! ⏳', 'success');
+        fetchStudentTeachers();
+        setIsEditing(false);
+      }
+    } catch (err) {
+      console.error('Error sending request:', err);
+    } finally {
+      setRequestingTeacher(false);
+    }
+  };
+
+  const handleRemoveTeacherRelation = async (relationId: string, status?: string) => {
+    let confirmMsg = 'Are you sure you want to disconnect from this teacher?';
+    if (status === 'pending') {
+      confirmMsg = 'Are you sure you want to cancel this connection request?';
+    } else if (status === 'rejected') {
+      confirmMsg = 'Are you sure you want to remove this declined request?';
+    }
+    if (!confirm(confirmMsg)) return;
+    try {
+      const { error } = await supabase
+        .from('student_teacher_relations')
+        .delete()
+        .eq('id', relationId);
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        toast(
+          status === 'pending'
+            ? 'Connection request cancelled.'
+            : status === 'rejected'
+            ? 'Declined request removed.'
+            : 'Teacher connection removed.',
+          'success'
+        );
+        fetchStudentTeachers();
+      }
+    } catch (err) {
+      console.error('Error deleting relation:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'account') {
+      fetchStudentTeachers();
+    }
+  }, [activeTab, profile]);
+
+  const fetchHistory = async () => {
+    if (!profile?.id) return;
+    setLoadingAttempts(true);
+    try {
+      const { data, error } = await supabase
+        .from('activity_attempts')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching history:', error);
+        return;
+      }
+
+      if (data && data.length > 20) {
+        const keepList = data.slice(0, 20);
+        const deleteIds = data.slice(20).map(item => item.id);
+
+        // Delete older activities in background
+        supabase
+          .from('activity_attempts')
+          .delete()
+          .in('id', deleteIds)
+          .then(({ error: deleteError }) => {
+            if (deleteError) {
+              console.error('Error deleting old activities:', deleteError);
+            }
+          });
+
+        setAttempts(keepList);
+      } else {
+        setAttempts(data || []);
+      }
+    } catch (err) {
+      console.error('Error in fetchHistory:', err);
+    } finally {
+      setLoadingAttempts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'recent') {
+      fetchHistory();
+    }
+  }, [activeTab, profile]);
 
   // XP count animation state for points settings tab
   const [displayedXP, setDisplayedXP] = useState(0);
@@ -403,7 +589,7 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
   // Navigation Items
   const tabs = [
     { key: 'account', label: 'Account', icon: User },
-    { key: 'avatar', label: 'Avatar', icon: Smile },
+    { key: 'recent', label: 'Recent', icon: Clock },
     { key: 'profile_view', label: 'User Profile', icon: User },
     { key: 'points', label: 'Points & Titles', icon: Award },
     { key: 'level', label: 'Levels and Badges', icon: Trophy },
@@ -547,6 +733,146 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
             <p><strong>Class:</strong> {className}</p>
           </div>
         </Card>
+
+        {/* My Teachers Section */}
+        {!isEditing && (
+          <Card>
+            <div className="flex items-center gap-2 mb-4 border-b border-surface-100 pb-3">
+              <span className="text-xl">👨‍🏫</span>
+              <h3 className="font-bold text-surface-900 font-headline-sm">My Teachers</h3>
+            </div>
+
+            {fetchingTeachers ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* List Current / Pending Teachers */}
+                {teachers.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {teachers.map((relation) => {
+                      const initials = relation.teacher?.full_name?.[0]?.toUpperCase() || '?';
+                      return (
+                        <div 
+                          key={relation.id}
+                          className="flex items-center justify-between p-3.5 bg-surface-50 border border-surface-200 rounded-2xl"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar
+                              avatarUrl={relation.teacher?.avatar_url || null}
+                              initials={initials}
+                              className="w-10 h-10 border border-white text-sm font-bold bg-secondary-100 text-secondary-750"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-surface-900 truncate">
+                                {relation.teacher?.full_name || 'Teacher'}
+                              </p>
+                              <p className="text-xs text-surface-450 truncate">
+                                @{relation.teacher?.username || 'username'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {relation.status === 'pending' ? (
+                              <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                                Pending Approval
+                              </span>
+                            ) : relation.status === 'rejected' ? (
+                              <span className="text-[10px] font-black uppercase text-danger-700 bg-danger-50 border border-danger-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                                Request Declined
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                                Connected
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleRemoveTeacherRelation(relation.id, relation.status)}
+                              className="p-1 text-danger hover:bg-danger-50 rounded-lg transition-colors cursor-pointer"
+                              title={
+                                relation.status === 'pending'
+                                  ? 'Cancel Request'
+                                  : relation.status === 'rejected'
+                                  ? 'Remove Request'
+                                  : 'Disconnect'
+                              }
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-surface-450 text-center py-2 font-medium">
+                    No teachers connected. Click Edit to connect to a teacher.
+                  </p>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Connect to Teacher Form (Only in Edit Mode) */}
+        {isEditing && (
+          <Card>
+            <div className="flex items-center gap-2 mb-4 border-b border-surface-100 pb-3">
+              <span className="text-xl">👨‍🏫</span>
+              <h3 className="font-bold text-surface-900 font-headline-sm">Connect to a Teacher</h3>
+            </div>
+            {allSchoolTeachers.length > 0 ? (
+              <div className="flex flex-col gap-3 max-h-[320px] overflow-y-auto pr-1">
+                {allSchoolTeachers.map((teacher) => {
+                  const initials = teacher.full_name?.[0]?.toUpperCase() || '?';
+                  const isRequestingThisTeacher = requestingTeacher && selectedTeacherId === teacher.id;
+                  
+                  return (
+                    <div 
+                      key={teacher.id}
+                      className="flex items-center justify-between p-3.5 bg-surface-50 border border-surface-200 rounded-2xl gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar
+                          avatarUrl={teacher.avatar_url || null}
+                          initials={initials}
+                          className="w-10 h-10 border border-white text-sm font-bold bg-secondary-100 text-secondary-750 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-surface-900 truncate">
+                            {teacher.full_name || 'Teacher'}
+                          </p>
+                          <p className="text-xs text-surface-450 truncate">
+                            @{teacher.username || 'username'}{teacher.schools?.name ? ` • ${teacher.schools.name}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleSendTeacherRequest(teacher.id)}
+                        disabled={requestingTeacher}
+                        className="bg-primary hover:bg-primary/95 text-white font-extrabold text-xs px-4 py-2 rounded-xl cursor-pointer shadow-xs transition-all shrink-0 flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isRequestingThisTeacher ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <UserPlus size={14} className="stroke-[2.5]" />
+                        )}
+                        <span>Connect</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-surface-400 text-center py-1 font-medium">
+                No other available teachers in your school.
+              </p>
+            )}
+          </Card>
+        )}
 
         <Button
           size="lg"
@@ -1161,13 +1487,17 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
           
           <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10">
             {/* Avatar with neon glowing border */}
-            <div className="relative shrink-0 rounded-full ring-4 ring-primary/30 shadow-[0_0_20px_rgba(94,59,219,0.25)] p-0.5 bg-white">
+            <button
+              onClick={() => setActiveTab('avatar')}
+              className="relative shrink-0 rounded-full ring-4 ring-primary/30 shadow-[0_0_20px_rgba(94,59,219,0.25)] p-0.5 bg-white hover:opacity-90 transition-opacity cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              title="Customize Avatar"
+            >
               <Avatar
                 avatarUrl={profile?.avatar_url || null}
                 initials={initials}
                 className="w-24 h-24 text-4xl font-extrabold border-2 border-white"
               />
-            </div>
+            </button>
 
             {/* Profile Info */}
             <div className="text-center sm:text-left">
@@ -1190,26 +1520,26 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
         </Card>
 
         {/* Stats & Level Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6">
           {/* Experience Title Card */}
           <div 
             onClick={() => setActiveTab('points')}
-            className={`p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer relative overflow-hidden flex items-center justify-between gap-4 ${
+            className={`p-4 sm:p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer relative overflow-hidden flex items-center justify-between gap-3 sm:gap-4 ${
               fullTitle
                 ? 'bg-white border border-surface-200 shadow-sm hover:shadow-md'
                 : 'bg-slate-50/90 border-2 border-dashed border-slate-300 shadow-inner hover:border-primary/50'
             }`}
           >
-            <div className="flex items-center gap-4 min-w-0">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
+            <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
                 fullTitle
                   ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm'
                   : 'bg-white text-primary border-2 border-dashed border-primary/50 shadow-xs'
               }`}>
                 {fullTitle ? (
-                  <span className="text-2xl">{titleEmoji}</span>
+                  <span className="text-xl sm:text-2xl">{titleEmoji}</span>
                 ) : (
-                  <Plus size={22} className="stroke-[2.5]" />
+                  <Plus size={18} className="stroke-[2.5]" />
                 )}
               </div>
               <div className="min-w-0">
@@ -1220,12 +1550,12 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
                 }`}>
                   Current Title
                 </span>
-                <h4 className={`font-black text-lg leading-snug truncate ${
+                <h4 className={`font-black text-base sm:text-lg leading-snug truncate ${
                   fullTitle ? 'text-surface-900' : 'text-slate-500 font-bold'
                 }`}>
                   {titleText}
                 </h4>
-                <p className={`text-xs mt-1 font-body-md ${
+                <p className={`text-[10px] sm:text-xs mt-1 font-body-md ${
                   fullTitle ? 'text-surface-500' : 'text-slate-400 font-semibold'
                 }`}>
                   {fullTitle ? 'Equipped Title' : 'Click to equip a title'}
@@ -1233,24 +1563,17 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
               </div>
             </div>
 
-            <button
-              onClick={(e) => { e.stopPropagation(); setActiveTab('points'); }}
-              className="text-xs font-bold text-primary hover:underline shrink-0 cursor-pointer"
-              title={fullTitle ? 'Change Title' : 'Equip Title'}
-            >
-              {fullTitle ? 'Change' : 'Equip'}
-            </button>
           </div>
 
           {/* Competitive Rank Arena Widget */}
-          <Card className="p-6 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg bg-white relative overflow-hidden flex flex-col justify-center">
+          <Card className="p-4 sm:p-6 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg bg-white relative overflow-hidden flex flex-col justify-center">
             {/* Decorative background element */}
             <div className="absolute -right-12 -bottom-12 w-32 h-32 bg-slate-100/50 rounded-full blur-xl pointer-events-none" />
             
-            <div className="flex items-center gap-4 relative z-10 opacity-30 select-none pointer-events-none">
+            <div className="flex items-center gap-2.5 sm:gap-4 relative z-10 opacity-30 select-none pointer-events-none">
               {/* Diamond Badge */}
-              <div className="flex items-center justify-center p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl shadow-sm shrink-0">
-                <svg className="w-12 h-12 drop-shadow-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div className="flex items-center justify-center p-2.5 sm:p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl shadow-sm shrink-0">
+                <svg className="w-10 h-10 sm:w-12 sm:h-12 drop-shadow-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <linearGradient id="silverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#ffffff" />
@@ -1270,10 +1593,10 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
                 <span className="inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full select-none mb-1.5">
                   Current Rank
                 </span>
-                <h4 className="font-headline-sm font-black text-lg text-surface-900 leading-none">
+                <h4 className="font-headline-sm font-black text-base sm:text-lg text-surface-900 leading-none">
                   Silver III
                 </h4>
-                <p className="text-xs font-bold text-slate-700 mt-1 font-body-md truncate">
+                <p className="text-[10px] sm:text-xs font-bold text-slate-700 mt-1 font-body-md truncate">
                   Rank #1 in School
                 </p>
               </div>
@@ -1281,13 +1604,13 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
 
             {/* Glassmorphic coming soon overlay */}
             <div className="absolute inset-0 z-20 bg-white/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-auto">
-              <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-md border border-slate-100 animate-fade-in">
-                <div className="w-8 h-8 bg-primary-50 text-primary rounded-xl flex items-center justify-center shrink-0 border border-primary-100">
-                  <Trophy size={16} className="animate-pulse" />
+              <div className="flex items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur-md px-3 py-2 sm:px-5 sm:py-2.5 rounded-2xl shadow-md border border-slate-100 animate-fade-in max-w-[90%] sm:max-w-none">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-50 text-primary rounded-xl flex items-center justify-center shrink-0 border border-primary-100">
+                  <Trophy size={14} className="animate-pulse" />
                 </div>
-                <div className="text-left">
-                  <h4 className="font-bold text-sm text-surface-900 leading-none">Rank Arena</h4>
-                  <span className="text-[9px] font-extrabold text-primary uppercase tracking-wider block mt-1 leading-none">Coming Soon..</span>
+                <div className="text-left min-w-0">
+                  <h4 className="font-bold text-xs sm:text-sm text-surface-900 leading-none truncate">Rank Arena</h4>
+                  <span className="text-[8px] sm:text-[9px] font-extrabold text-primary uppercase tracking-wider block mt-1 leading-none">Coming Soon..</span>
                 </div>
               </div>
             </div>
@@ -1514,6 +1837,115 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
     }, 1500);
   };
 
+  const renderRecentSettings = () => {
+    const formatDate = (date: string) => {
+      return new Date(date).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    };
+
+    const activityEmoji: Record<string, string> = {
+      quiz: '🧠',
+      flashcard: '📄',
+      matching: '🔗',
+      picture: '🖼️',
+    };
+
+    if (loadingAttempts) {
+      return (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="animate-fade-in flex flex-col gap-6">
+        <Card>
+          <div className="flex items-center gap-3 mb-6 border-b border-surface-100 pb-4">
+            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center">
+              <Clock size={22} className="stroke-[2.5]" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-surface-900 font-headline-sm">Recent Activities</h3>
+              <p className="text-sm text-surface-500 font-body-md">View your history of played activities</p>
+            </div>
+          </div>
+
+          {attempts.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">📭</div>
+              <h4 className="text-base font-bold text-surface-900 mb-2">No Activities Yet</h4>
+              <p className="text-sm text-surface-500">Start playing to see your history here!</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {attempts.map((attempt) => {
+                const percentage = attempt.total_questions > 0
+                  ? Math.round((attempt.score / attempt.total_questions) * 100)
+                  : 0;
+
+                return (
+                  <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-surface-50 border border-surface-200 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white border border-surface-200 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 shadow-3xs">
+                        {activityEmoji[attempt.activity_type] || '❓'}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-surface-900 capitalize text-sm">
+                            {attempt.activity_type}
+                          </p>
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                            attempt.mode === 'competitive' 
+                              ? 'bg-danger-50 text-danger-700 border-danger-200' 
+                              : 'bg-primary-50 text-primary-700 border-primary-200'
+                          }`}>
+                            {attempt.mode}
+                          </span>
+                        </div>
+                        <p className="text-xs text-surface-450 font-bold">{formatDate(attempt.created_at)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 border-surface-150 pt-3 sm:pt-0">
+                      <div className="text-center min-w-[50px]">
+                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">Score</span>
+                        <div className="flex items-center justify-center gap-1 text-sm font-black text-surface-850 mt-1">
+                          <Target size={13} className="text-primary" />
+                          <span>{percentage}%</span>
+                        </div>
+                      </div>
+                      <div className="text-center min-w-[50px]">
+                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">Time</span>
+                        <div className="flex items-center justify-center gap-1 text-sm font-black text-surface-850 mt-1">
+                          <Clock size={13} className="text-indigo-500" />
+                          <span>{attempt.time_taken_seconds}s</span>
+                        </div>
+                      </div>
+                      <div className="text-center min-w-[50px]">
+                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">XP</span>
+                        <div className="flex items-center justify-center gap-1 text-sm font-black text-warning-700 mt-1">
+                          <Star size={13} className="text-warning-500 fill-warning-500/20" />
+                          <span>+{attempt.points_earned}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
   const renderVersionSettings = () => {
     return (
       <div className="flex flex-col gap-6">
@@ -1571,8 +2003,8 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto">
-      <h1 className="text-2xl font-extrabold text-surface-900 mb-2 font-headline-md">Settings ⚙️</h1>
-      <p className="text-surface-500 mb-8 font-body-md">Manage your account, appearance, and privacy</p>
+      <h1 className="hidden md:block text-2xl font-extrabold text-surface-900 mb-2 font-headline-md">Settings ⚙️</h1>
+      <p className="hidden md:block text-surface-500 mb-8 font-body-md">Manage your account, appearance, and privacy</p>
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Left Sidebar Navigation */}
@@ -1603,6 +2035,7 @@ export default function SettingsPage({ defaultTab = 'account' }: SettingsPagePro
         {/* Right Content Panel */}
         <div className="flex-grow">
           {activeTab === 'account' && renderAccountSettings()}
+          {activeTab === 'recent' && renderRecentSettings()}
           {activeTab === 'avatar' && renderAvatarSettings()}
           {activeTab === 'profile_view' && renderUserProfileSettings()}
           {activeTab === 'level' && renderLevelSettings()}

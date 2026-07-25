@@ -300,7 +300,7 @@ export default function StudentHomePage() {
       {/* Play Zone */}
       <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <h3 className="text-2xl font-extrabold text-on-background">Play Zone</h3>
+          <h3 className="hidden sm:block text-2xl font-extrabold text-on-background">Play Zone</h3>
           <div className="flex items-center gap-3">
             {/* Question Count Dropdown */}
             <div className="relative">

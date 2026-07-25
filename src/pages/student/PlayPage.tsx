@@ -20,6 +20,7 @@ export default function PlayPage() {
   const activityType = searchParams.get('type') as ActivityType;
   const mode = searchParams.get('mode') as PlayMode;
   const questionCount = parseInt(searchParams.get('count') || '10');
+  const shareId = searchParams.get('share_id');
 
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,6 +141,16 @@ export default function PlayPage() {
           .from('student_question_progress')
           .upsert(progressRows, { onConflict: 'user_id,content_id' });
       }
+
+      if (shareId) {
+        await supabase.from('student_share_submissions').upsert({
+          share_id: shareId,
+          student_id: profile.id,
+          status: 'completed',
+          score: score,
+          completed_at: new Date().toISOString()
+        }, { onConflict: 'share_id,student_id' });
+      }
     }
 
     // Navigate to result
@@ -155,9 +166,12 @@ export default function PlayPage() {
     // Add chapters and question count configuration for "Play Again"
     chapterIds.forEach(id => params.append('chapters', id));
     params.set('count', questionCount.toString());
+    if (shareId) {
+      params.set('share_id', shareId);
+    }
 
     navigate(`/student/result?${params.toString()}`, { replace: true });
-  }, [startTime, mode, profile, chapterIds, activityType, questionCount, navigate]);
+  }, [startTime, mode, profile, chapterIds, activityType, questionCount, navigate, shareId]);
 
   if (loading) {
     return (

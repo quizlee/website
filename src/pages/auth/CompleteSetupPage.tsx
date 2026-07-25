@@ -181,7 +181,7 @@ export default function CompleteSetupPage() {
         username,
         gender: gender || null,
         date_of_birth: dateOfBirth || null,
-        school_id: role === 'student' ? schoolId : null,
+        school_id: (role === 'student' || role === 'teacher') ? schoolId : null,
         class_id: role === 'student' ? classId : null,
         verification_status: role === 'teacher' ? 'pending' : null,
         avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
@@ -364,27 +364,27 @@ export default function CompleteSetupPage() {
               onChange={(e) => setDateOfBirth(e.target.value)}
             />
 
-            {role === 'student' && (
-              <>
-                <Select
-                  label="School"
-                  placeholder="Select your school"
-                  value={schoolId}
-                  onChange={(e) => setSchoolId(e.target.value)}
-                  options={schools.map((s) => ({ value: s.id, label: s.name }))}
-                  required
-                />
+            {(role === 'student' || role === 'teacher') && (
+              <Select
+                label="School"
+                placeholder="Select your school"
+                value={schoolId}
+                onChange={(e) => setSchoolId(e.target.value)}
+                options={schools.map((s) => ({ value: s.id, label: s.name }))}
+                required
+              />
+            )}
 
-                <Select
-                  label="Class"
-                  placeholder={schoolId ? "Select your class" : "Select school first"}
-                  value={classId}
-                  onChange={(e) => setClassId(e.target.value)}
-                  options={classes.map((c) => ({ value: c.id, label: c.name }))}
-                  disabled={!schoolId}
-                  required
-                />
-              </>
+            {role === 'student' && (
+              <Select
+                label="Class"
+                placeholder={schoolId ? "Select your class" : "Select school first"}
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+                options={classes.map((c) => ({ value: c.id, label: c.name }))}
+                disabled={!schoolId}
+                required
+              />
             )}
 
             <Button

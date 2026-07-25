@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import confetti from 'canvas-confetti';
-import { Home, RotateCcw, Trophy, Clock, Target, Star } from 'lucide-react';
+import { Home, RotateCcw, Trophy, Clock, Target, Star, GraduationCap } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 
@@ -20,6 +20,7 @@ export default function ResultPage() {
   const chapterIds = searchParams.getAll('chapters');
   const activityType = searchParams.get('type');
   const count = searchParams.get('count') || '10';
+  const shareId = searchParams.get('share_id');
 
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
 
@@ -34,6 +35,7 @@ export default function ResultPage() {
     playParams.set('type', activityType);
     if (mode) playParams.set('mode', mode);
     playParams.set('count', count);
+    if (shareId) playParams.set('share_id', shareId);
     
     navigate(`/student/play?${playParams.toString()}`, { replace: true });
   };
@@ -207,13 +209,23 @@ export default function ResultPage() {
             <RotateCcw size={18} />
             Play Again
           </button>
-          <button
-            onClick={() => navigate('/student/practice')}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer"
-          >
-            <Home size={18} />
-            Home
-          </button>
+          {shareId ? (
+            <button
+              onClick={() => navigate('/student/class-activities')}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-indigo-600 hover:bg-indigo-700 text-white bouncy shadow-lg hover:shadow-indigo-500/20 cursor-pointer"
+            >
+              <GraduationCap size={18} />
+              Classroom
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/student/practice')}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer"
+            >
+              <Home size={18} />
+              Home
+            </button>
+          )}
         </div>
       </div>
     </div>

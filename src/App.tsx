@@ -26,8 +26,9 @@ import PlayPage from './pages/student/PlayPage';
 import ResultPage from './pages/student/ResultPage';
 import LeaderboardPage from './pages/student/LeaderboardPage';
 import CompetePage from './pages/student/CompetePage';
-import HistoryPage from './pages/student/HistoryPage';
 import SettingsPage from './pages/student/SettingsPage';
+import FriendsPage from './pages/student/FriendsPage';
+import StudentClassActivitiesPage from './pages/student/ClassActivitiesPage';
 import { getSavedTheme, applyTheme } from './lib/theme';
 
 // Teacher Pages
@@ -36,6 +37,7 @@ import ContentManagerPage from './pages/teacher/ContentManagerPage';
 import BulkImportPage from './pages/teacher/BulkImportPage';
 import PendingApprovalPage from './pages/teacher/PendingApprovalPage';
 import TeacherAccountPage from './pages/teacher/AccountPage';
+import TeacherClassActivitiesPage from './pages/teacher/ClassActivitiesPage';
 
 // Admin Pages
 import SetupPage from './pages/admin/SetupPage';
@@ -152,10 +154,11 @@ export default function App() {
           <Route path="play" element={<PlayPage />} />
           <Route path="result" element={<ResultPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="class-activities" element={<StudentClassActivitiesPage />} />
+          <Route path="friends" element={<FriendsPage />} />
           <Route path="compete" element={<CompetePage />} />
-          <Route path="history" element={<HistoryPage />} />
-          <Route path="account" element={<SettingsPage key="account" defaultTab="account" />} />
-          <Route path="settings" element={<SettingsPage key="settings" defaultTab="account" />} />
+          <Route path="account" element={<SettingsPage key="account" defaultTab="profile_view" />} />
+          <Route path="settings" element={<SettingsPage key="settings" defaultTab="profile_view" />} />
         </Route>
 
         {/* Teacher Panel */}
@@ -178,6 +181,7 @@ export default function App() {
           <Route index element={<TeacherDashboardPage />} />
           <Route path="content" element={<ContentManagerPage />} />
           <Route path="import" element={<BulkImportPage />} />
+          <Route path="class-activities" element={<TeacherClassActivitiesPage />} />
           <Route path="account" element={<TeacherAccountPage />} />
         </Route>
 
