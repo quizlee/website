@@ -951,9 +951,7 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
     const currentMilestoneObj = [...milestones].reverse().find(m => currentLevel >= m.lvl) || milestones[0];
     const ActiveMilestoneIcon = currentMilestoneObj.icon;
 
-    const currentMilestoneLvl = currentMilestoneObj.lvl;
-    const nextMilestoneObj = milestones.find(m => m.lvl > currentLevel) || null;
-    const nextMilestoneLvl = nextMilestoneObj ? nextMilestoneObj.lvl : null;
+
 
     return (
       <div className="flex flex-col gap-6 animate-fade-in">
