@@ -159,90 +159,51 @@ export default function StudentLayout() {
               </nav>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Minus icon - commented out per user request
-              <button 
-                onClick={() => handleUpdatePoints(-100)}
-                className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-red-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
-                title="Decrease XP by 100"
-              >
-                <Minus size={20} />
-              </button>
-              */}
-
-              {/* Plus icon - commented out per user request
-              <button 
-                onClick={() => handleUpdatePoints(100)}
-                className="hidden sm:flex p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-green-500 transition-colors items-center justify-center bouncy cursor-pointer shrink-0"
-                title="Increase XP by 100"
-              >
-                <Plus size={20} />
-              </button>
-              */}
-
+            <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4">
               {/* Friends icon */}
               <button 
                 onClick={() => navigate('/student/friends')}
-                className="p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
+                className="p-1.5 sm:p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
                 title="Friends & Classmates"
               >
-                <Users size={20} />
+                <Users size={18} className="sm:w-5 sm:h-5" />
               </button>
-
-
 
               {/* XP Count with Star Icon */}
               <div 
                 onClick={() => navigate('/student/settings', { state: { tab: 'points' } })}
-                className="flex items-center gap-1.5 bg-warning-50 hover:bg-warning-100/70 text-warning-700 px-3 py-1.5 rounded-full border border-warning-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
+                className="flex items-center gap-1 bg-warning-50 hover:bg-warning-100/70 text-warning-700 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-warning-200 text-xs sm:text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
                 title="XP (Experience Points)"
               >
-                <Star size={14} className="fill-warning-500 text-warning-500" />
+                <Star size={12} className="fill-warning-500 text-warning-500 sm:w-3.5 sm:h-3.5" />
                 <span>{displayedPoints} XP</span>
               </div>
 
               {/* Level Display */}
               <div 
                 onClick={() => navigate('/student/settings', { state: { tab: 'level' } })}
-                className="flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100/70 text-primary px-3 py-1.5 rounded-full border border-primary-200 text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
+                className="flex items-center gap-1 bg-primary-50 hover:bg-primary-100/70 text-primary px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-primary-200 text-xs sm:text-sm font-extrabold shadow-sm transition-colors cursor-pointer select-none bouncy shrink-0 whitespace-nowrap"
                 title="Current Level"
               >
-                <Award size={14} className="text-primary fill-primary/10" />
+                <Award size={12} className="text-primary fill-primary/10 sm:w-3.5 sm:h-3.5" />
                 <span>
                   <span className="hidden sm:inline">Level </span>
                   {currentLevel}
                 </span>
               </div>
 
-              {/* Daily Quota Indicator & Reset Button - commented out per user request
-              {profile && (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm select-none shrink-0 whitespace-nowrap">
-                  <span className="text-slate-500 font-semibold">
-                    Daily: <span className="font-extrabold text-slate-800">{getTodayXPEarned()}/200 XP</span>
-                  </span>
-                  <button
-                    onClick={handleResetDailyQuota}
-                    className="bg-primary hover:bg-primary/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black transition-colors cursor-pointer uppercase tracking-wider"
-                    title="Reset today's quota limit to 0"
-                  >
-                    Reset
-                  </button>
-                </div>
-              )}
-              */}
-
               {/* Profile Dropdown */}
               <div className="relative shrink-0" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-1.5 focus:outline-none cursor-pointer group shrink-0"
+                  className="flex items-center gap-1 sm:gap-1.5 focus:outline-none cursor-pointer group shrink-0"
                 >
                   <Avatar
                     avatarUrl={profile?.avatar_url || null}
                     initials={initials}
-                    className="w-10 h-10 border-2 border-white ring-2 ring-primary/20 text-primary-700 font-bold shrink-0"
+                    className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-white ring-2 ring-primary/20 text-primary-700 font-bold shrink-0"
                   />
-                  <ChevronDown size={14} className="text-on-surface-variant group-hover:text-primary transition-colors shrink-0" />
+                  <ChevronDown size={14} className="hidden sm:block text-on-surface-variant group-hover:text-primary transition-colors shrink-0" />
                 </button>
 
                 {dropdownOpen && (

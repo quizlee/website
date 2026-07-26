@@ -163,34 +163,58 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
 
   // Equipped Badges state for multi-collecting
   const [equippedBadges, setEquippedBadges] = useState<string[]>(() => {
-    if (!profile?.id) return [];
-    const saved = localStorage.getItem(`equipped_badges_${profile.id}`);
-    if (saved) {
+    if (profile?.milestone) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
+        const parsed = JSON.parse(profile.milestone);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    if (profile?.id) {
+      const saved = localStorage.getItem(`equipped_badges_${profile.id}`);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return [];
+        }
       }
     }
     return [];
   });
 
-  const handleToggleEquipBadge = (badgeLabel: string) => {
+  const handleToggleEquipBadge = async (badgeLabel: string) => {
     if (!profile?.id) return;
-    setEquippedBadges((prev) => {
-      const isEquipped = prev.includes(badgeLabel);
-      const next = isEquipped
-        ? prev.filter((b) => b !== badgeLabel)
-        : [...prev, badgeLabel];
-      localStorage.setItem(`equipped_badges_${profile.id}`, JSON.stringify(next));
-      toast(
-        isEquipped
-          ? `Unequipped badge: ${badgeLabel}`
-          : `Equipped badge: ${badgeLabel}! 🏅`,
-        'success'
-      );
-      return next;
-    });
+    const isEquipped = equippedBadges.includes(badgeLabel);
+    const next = isEquipped
+      ? equippedBadges.filter((b) => b !== badgeLabel)
+      : [...equippedBadges, badgeLabel];
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ milestone: JSON.stringify(next) })
+        .eq('id', profile.id);
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        setEquippedBadges(next);
+        localStorage.setItem(`equipped_badges_${profile.id}`, JSON.stringify(next));
+        setProfile({
+          ...profile,
+          milestone: JSON.stringify(next),
+        });
+        toast(
+          isEquipped
+            ? `Unequipped badge: ${badgeLabel}`
+            : `Equipped badge: ${badgeLabel}! 🏅`,
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Failed to update equipped badges', 'error');
+    }
   };
 
   // Recent Activities state
@@ -625,11 +649,23 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
                     {profile.title}
                   </span>
                 )}
-                {profile?.milestone && (
-                  <span className="text-[10px] font-extrabold bg-primary-50 text-primary border border-primary-200 px-2 py-0.5 rounded-full shadow-sm leading-none">
-                    {profile.milestone}
-                  </span>
-                )}
+                {profile?.milestone && (() => {
+                  try {
+                    const parsed = JSON.parse(profile.milestone);
+                    if (Array.isArray(parsed)) {
+                      return parsed.map((badgeName) => (
+                        <span key={badgeName} className="text-[10px] font-extrabold bg-primary-50 text-primary border border-primary-200 px-2 py-0.5 rounded-full shadow-sm leading-none">
+                          {badgeName}
+                        </span>
+                      ));
+                    }
+                  } catch (e) {}
+                  return (
+                    <span className="text-[10px] font-extrabold bg-primary-50 text-primary border border-primary-200 px-2 py-0.5 rounded-full shadow-sm leading-none">
+                      {profile.milestone}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="text-sm text-surface-500 mt-0.5">@{profile?.username || 'username'}</p>
               {user?.email && (
@@ -948,19 +984,12 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
                   {currentMilestoneObj.label}
                 </h3>
               </div>
-              <p className="text-sm text-surface-550 mb-6 font-body-md max-w-lg leading-relaxed select-none">
-                You achieved Milestone <span className="text-base font-extrabold text-indigo-700">Level {currentMilestoneLvl}</span>.
-                {nextMilestoneLvl ? (
-                  <> Next Milestones unlocks in <span className="text-base font-extrabold text-primary-700">Level {nextMilestoneLvl}</span>.</>
-                ) : (
-                  <> 🎉 Max Milestone Reached!</>
-                )}
-              </p>
+
 
               {/* Progress Stats */}
               <div className="flex justify-between items-end text-sm font-semibold text-surface-700 mb-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs bg-primary-50 text-primary px-2.5 py-1 rounded-full font-extrabold shadow-sm">
+                  <span className="text-xs bg-warning-50 text-warning-700 border border-warning-200 px-2.5 py-1 rounded-full font-extrabold shadow-sm">
                     {totalXP} XP Total
                   </span>
                 </div>
@@ -978,16 +1007,14 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
               {/* Progress Bar Container */}
               <div className="w-full h-4 bg-surface-100 rounded-full overflow-hidden shadow-inner border border-surface-200/50">
                 <div
-                  className="h-full bg-gradient-to-r from-primary to-indigo-600 rounded-full transition-all duration-1000 ease-out"
+                  className="h-full bg-gradient-to-r from-warning-500 to-amber-500 rounded-full transition-all duration-1000 ease-out"
                   style={{ width: `${levelProgressPercentage}%` }}
                 />
               </div>
 
               {/* Bottom labels */}
-              <div className="flex justify-between items-center mt-2.5 text-xs text-surface-450 font-bold">
-                <span>Level {currentLevel} ({currentLevelXP} XP)</span>
+              <div className="flex justify-center items-center mt-2.5 text-xs text-surface-450 font-bold">
                 <span>{levelProgressPercentage.toFixed(0)}% Completed</span>
-                <span>Level {nextLevel} ({nextLevelXP} XP)</span>
               </div>
             </div>
           </div>
@@ -1001,7 +1028,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
             </div>
             <div>
               <h3 className="font-bold text-lg text-surface-900 font-headline-sm">Milestones Badges</h3>
-              <p className="text-sm text-surface-500 font-body-md">Check the levels required to unlock and equip milestones Badges!</p>
             </div>
           </div>
 
@@ -1115,9 +1141,9 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
           {/* Decorative background circle */}
           <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-100/30 rounded-full blur-2xl pointer-events-none" />
           
-          <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+          <div className="flex flex-col md:flex-row items-stretch gap-8 relative z-10">
             {/* Star Icon container with XP count */}
-            <div className="flex flex-col items-center gap-3 shrink-0">
+            <div className="flex flex-col items-center justify-center gap-3 shrink-0">
               <div className="relative flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-tr from-warning-500 to-amber-500 shadow-lg shadow-warning-500/20 ring-4 ring-white animate-bounce-in">
                 <Star size={48} className="text-white fill-white/20 text-warning-100" />
               </div>
@@ -1127,24 +1153,18 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
             </div>
 
             {/* Level Info */}
-            <div className="flex-grow text-center md:text-left w-full">
-              <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full uppercase tracking-wider">
-                Current Title
-              </span>
-              <h3 className="font-black text-3xl text-surface-950 font-headline-md mt-2.5 mb-1.5">
-                {profile?.title || 'No Title Equipped'}
-              </h3>
-              <p className="text-sm text-surface-550 mb-4 font-body-md">
-                You have accumulated <strong className="text-surface-700">{totalXP} XP</strong>.
-                {nextTitleObj ? (
-                  <span> Next title unlocks in <strong className="text-surface-750">{nextTitleObj.xp - totalXP} XP</strong>.</span>
-                ) : (
-                  <span> You have unlocked the ultimate title! You are a true legend.</span>
-                )}
-              </p>
+            <div className="flex-grow text-center md:text-left w-full flex flex-col">
+              <div>
+                <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full uppercase tracking-wider">
+                  Current Title
+                </span>
+                <h3 className="font-black text-3xl text-surface-950 font-headline-md mt-2.5 mb-1.5">
+                  {profile?.title || 'No Title Equipped'}
+                </h3>
+              </div>
 
               {nextTitleObj && (
-                <div>
+                <div className="mt-auto pt-4 md:pt-0">
                   <div className="flex justify-between items-center text-xs font-bold text-surface-500 mb-1.5">
                     <span>Progress to Next Title...</span>
                     <span>{((totalXP / nextTitleObj.xp) * 100).toFixed(0)}%</span>
@@ -1169,7 +1189,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
             </div>
             <div>
               <h3 className="font-bold text-lg text-surface-900 font-headline-sm">Title Tiers</h3>
-              <p className="text-sm text-surface-500 font-body-md">Unlock these titles by earning XP across the platform</p>
             </div>
           </div>
 

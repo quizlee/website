@@ -184,25 +184,39 @@ export default function PracticePage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [chapterContentMap, setChapterContentMap] = useState<Record<string, string[]>>({});
   const [selectedSubjectIdx, setSelectedSubjectIdx] = useState(() => {
-    const saved = sessionStorage.getItem('practice_selected_subject_idx');
+    const saved = localStorage.getItem('practice_selected_subject_idx');
     return saved ? Number(saved) : 0;
   });
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [loadingChapters, setLoadingChapters] = useState(false);
+  const [showSubjectCard, setShowSubjectCard] = useState(true);
 
   // Inline chapter selection (on the page itself)
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>(() => {
-    const saved = sessionStorage.getItem('practice_selected_chapters');
+    const saved = localStorage.getItem('practice_selected_chapters');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    sessionStorage.setItem('practice_selected_subject_idx', selectedSubjectIdx.toString());
+    localStorage.setItem('practice_selected_subject_idx', selectedSubjectIdx.toString());
   }, [selectedSubjectIdx]);
 
   useEffect(() => {
-    sessionStorage.setItem('practice_selected_chapters', JSON.stringify(selectedChapterIds));
+    localStorage.setItem('practice_selected_chapters', JSON.stringify(selectedChapterIds));
   }, [selectedChapterIds]);
+
+  // Monitor scroll positioning to hide/show subject card
+  useEffect(() => {
+    const el = chapterScrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      setShowSubjectCard(el.scrollLeft <= 5);
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Modal state
   const [activeActivityType, setActiveActivityType] = useState<string | null>(null);
@@ -271,6 +285,7 @@ export default function PracticePage() {
 
   // Fetch chapters & content types when subject changes (with instant cache load)
   useEffect(() => {
+    setShowSubjectCard(true);
     if (!selectedSubject) { 
       setChapters([]); 
       setChapterContentMap({});
@@ -421,10 +436,16 @@ export default function PracticePage() {
 
       {/* ── Subject + Chapter Selector ─────────────────────────────── */}
       <section className="mb-6">
-        <div className="flex flex-row md:grid md:grid-cols-12 gap-gutter items-stretch">
+        <div className="flex flex-row items-stretch gap-4 w-full">
 
           {/* Left: Subject Card — stretched to match right column height */}
-          <div className="w-[120px] sm:w-[130px] md:w-auto md:col-span-3 flex flex-col flex-shrink-0 min-h-[130px] md:min-h-[170px] mb-5">
+          <div 
+            className={`flex flex-col flex-shrink-0 min-h-[130px] md:min-h-[170px] mb-5 transition-all duration-500 ease-in-out overflow-hidden ${
+              showSubjectCard 
+                ? 'w-[120px] sm:w-[130px] md:w-[220px] lg:w-[260px] opacity-100 mr-0' 
+                : 'w-0 opacity-0 -mr-4 pointer-events-none'
+            }`}
+          >
             <div className={`relative rounded-3xl overflow-hidden h-full flex flex-col p-3 md:p-5 bg-gradient-to-br ${gradient.from} ${gradient.to} shadow-xl ${gradient.shadow}`}>
               {/* Decorative blobs */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none hidden md:block" />
@@ -458,9 +479,9 @@ export default function PracticePage() {
                     {subjects.length > 1 && (
                       <div className="relative w-full">
                         <select
-                          value={selectedSubjectIdx}
-                          onChange={(e) => setSelectedSubjectIdx(Number(e.target.value))}
-                          className="appearance-none w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold font-label-md text-[10px] md:text-xs pl-2 md:pl-4 pr-5 md:pr-8 py-1 md:py-1.5 rounded-full cursor-pointer hover:bg-white/30 transition-all focus:outline-none shadow-sm text-ellipsis overflow-hidden whitespace-nowrap"
+                           value={selectedSubjectIdx}
+                           onChange={(e) => setSelectedSubjectIdx(Number(e.target.value))}
+                           className="appearance-none w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold font-label-md text-[10px] md:text-xs pl-2 md:pl-4 pr-5 md:pr-8 py-1 md:py-1.5 rounded-full cursor-pointer hover:bg-white/30 transition-all focus:outline-none shadow-sm text-ellipsis overflow-hidden whitespace-nowrap"
                         >
                           {subjects.map((sub, i) => (
                             <option key={sub.id} value={i} className="text-on-background bg-white font-semibold">
@@ -482,14 +503,19 @@ export default function PracticePage() {
           </div>
 
           {/* Right: Chapter Cards */}
-          <div className="flex-grow min-w-0 md:col-span-9 flex flex-col gap-3">
+          <div className="flex-grow min-w-0 flex flex-col gap-3">
             <div className="flex items-center justify-between px-1">
-              <div className="hidden sm:block">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant select-none">
-                  {selectedChapterIds.length === 0
-                    ? 'Select Chapters to Practice'
-                    : `${selectedChapterIds.length} Chapter${selectedChapterIds.length > 1 ? 's' : ''} selected`
-                  }
+              <div>
+                <h3 className="text-[10px] sm:text-sm font-semibold uppercase tracking-wider text-on-surface-variant select-none">
+                  {selectedChapterIds.length === 0 ? (
+                    <span>
+                      Select Chapters<span className="hidden sm:inline"> to Practice</span>
+                    </span>
+                  ) : (
+                    <span>
+                      {selectedChapterIds.length} Chapter{selectedChapterIds.length > 1 ? 's' : ''} selected
+                    </span>
+                  )}
                 </h3>
               </div>
               <div className="flex items-center gap-2 ml-auto">

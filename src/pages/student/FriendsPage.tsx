@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { Avatar } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
 import { 
   Award, 
   Star, 
@@ -59,12 +61,19 @@ interface FriendProfile {
 
 export default function FriendsPage() {
   const { profile } = useAuthStore();
+  const location = useLocation();
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'school' | 'class'>('school');
   const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.showInvite) {
+      setShowInviteModal(true);
+    }
+  }, [location]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.origin);
@@ -129,6 +138,13 @@ export default function FriendsPage() {
       return friend.class_id === profile?.class_id;
     }
     return true;
+  });
+
+  // Sort alphabetically by full name (or username) on any device
+  const displayFriends = [...filteredFriends].sort((a, b) => {
+    const nameA = (a.full_name || a.username || '').toLowerCase();
+    const nameB = (b.full_name || b.username || '').toLowerCase();
+    return nameA.localeCompare(nameB);
   });
 
   if (loading) {
@@ -200,7 +216,7 @@ export default function FriendsPage() {
       </div>
 
       {/* Friends Grid */}
-      {filteredFriends.length === 0 ? (
+      {displayFriends.length === 0 ? (
         <Card className="text-center py-16">
           <div className="text-5xl mb-4 select-none">👋</div>
           <h3 className="font-bold text-lg text-surface-900 mb-1">No Friends Found</h3>
@@ -211,8 +227,8 @@ export default function FriendsPage() {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {filteredFriends.map((friend) => {
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
+          {displayFriends.map((friend) => {
             const friendLevel = getLevelFromXP(friend.points);
             const initials = friend.full_name?.[0]?.toUpperCase() || friend.username?.[0]?.toUpperCase() || '?';
             
@@ -220,34 +236,21 @@ export default function FriendsPage() {
               <Card
                 key={friend.id}
                 onClick={() => setSelectedFriend(friend)}
-                className="group p-5 hover:shadow-md hover:border-primary-200 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer bg-white relative overflow-hidden"
+                className="group px-3 sm:px-5 py-3.5 hover:shadow-md hover:border-primary-200 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer bg-white relative overflow-hidden"
               >
-                {/* Micro-sparkle effect on card hover */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-primary">
-                  <Sparkles size={16} className="animate-pulse" />
-                </div>
-
-                <div className="flex items-center gap-4">
-                  {/* Avatar wrapper with Level overlay badge */}
-                  <div className="relative shrink-0">
-                    <Avatar
-                      avatarUrl={friend.avatar_url}
-                      initials={initials}
-                      className="w-14 h-14 border-2 border-white ring-2 ring-surface-100 group-hover:ring-primary/20 text-lg font-bold"
-                    />
-                    <div className="absolute -bottom-1.5 -right-1.5 bg-gradient-to-tr from-primary to-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 border-white shadow-xs">
-                      {friendLevel}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-3 sm:gap-4">
+                  {/* Avatar logo */}
+                  <Avatar
+                    avatarUrl={friend.avatar_url}
+                    initials={initials}
+                    className="w-14 h-14 border-2 border-white ring-2 ring-surface-100 group-hover:ring-primary/20 text-lg font-bold shrink-0"
+                  />
 
                   {/* Profile info details */}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-extrabold text-surface-900 truncate leading-snug group-hover:text-primary transition-colors">
+                  <div className="min-w-0 flex-1 flex flex-col justify-center items-start">
+                    <h3 className="w-full font-extrabold text-surface-900 truncate leading-snug group-hover:text-primary transition-colors">
                       {friend.privacy === 'public' ? friend.full_name || friend.username : friend.username || 'Hidden Friend'}
                     </h3>
-                    <p className="text-xs text-surface-450 font-bold truncate">
-                      @{friend.username || 'username'}
-                    </p>
                     
                     {/* Active Equipped Title badge */}
                     {friend.title ? (
@@ -263,14 +266,16 @@ export default function FriendsPage() {
                 </div>
 
                 {/* Score stats footer */}
-                <div className="mt-4 pt-3.5 border-t border-surface-100 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1 text-warning-700 font-extrabold">
-                    <Star size={13} className="fill-warning-500 text-warning-500" />
+                <div className="mt-3.5 pt-2.5 border-t border-surface-100 flex items-center justify-between gap-1 text-xs">
+                  <div className="flex items-center gap-0.5 text-warning-700 font-extrabold whitespace-nowrap shrink-0">
+                    <Star size={12} className="fill-warning-500 text-warning-500 shrink-0" />
                     <span>{friend.points.toLocaleString()} XP</span>
                   </div>
 
-                  <span className="text-[10px] font-bold text-primary bg-primary-50 border border-primary-200/50 px-2 py-0.5 rounded-lg">
-                    Level {friendLevel}
+                  <span className="text-[10px] font-bold text-primary bg-primary-50 border border-primary-200/50 px-1.5 py-0.5 rounded-lg whitespace-nowrap shrink-0">
+                    <span className="sm:hidden">Lvl </span>
+                    <span className="hidden sm:inline">Level </span>
+                    {friendLevel}
                   </span>
                 </div>
               </Card>
@@ -282,7 +287,20 @@ export default function FriendsPage() {
       {/* Friend Detail Drawer Modal */}
       {selectedFriend && (() => {
         const friendLevel = getLevelFromXP(selectedFriend.points);
-        const unlockedMilestones = milestones.filter(m => friendLevel >= m.lvl);
+        
+        // Parse equipped badges list from milestone JSON array or legacy string
+        let equippedBadgesList: string[] = [];
+        if (selectedFriend.milestone) {
+          try {
+            const parsed = JSON.parse(selectedFriend.milestone);
+            if (Array.isArray(parsed)) {
+              equippedBadgesList = parsed;
+            }
+          } catch (e) {
+            equippedBadgesList = [selectedFriend.milestone];
+          }
+        }
+        const equippedMilestones = milestones.filter(m => equippedBadgesList.includes(m.label));
         const initials = selectedFriend.full_name?.[0]?.toUpperCase() || selectedFriend.username?.[0]?.toUpperCase() || '?';
         const fullTitle = selectedFriend.title || '';
         let titleEmoji = '🏷️';
@@ -373,33 +391,19 @@ export default function FriendsPage() {
                 {/* Badge Collection */}
                 <div className="mt-5 border-t border-surface-100 pt-4">
                   <span className="block text-[10px] font-extrabold uppercase tracking-wider text-surface-400 mb-3 select-none">
-                    Badge Collection ({unlockedMilestones.length})
+                    Badge Collection ({equippedMilestones.length})
                   </span>
                   
-                  {unlockedMilestones.length === 0 ? (
+                  {equippedMilestones.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-6 px-4 border border-dashed border-surface-200 rounded-2xl bg-surface-50/85 text-center">
                       <Award size={24} className="text-surface-300 stroke-[2] mb-1.5" />
-                      <p className="text-xs font-bold text-surface-400">No Badges Unlocked Yet</p>
+                      <p className="text-xs font-bold text-surface-400">No Badges Equipped Yet</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-4 gap-3 justify-items-center bg-surface-50/50 border border-surface-150 rounded-2xl p-4">
-                      {unlockedMilestones.map((m) => {
-                        const MilestoneIcon = m.icon;
-                        return (
-                          <div 
-                            key={m.label} 
-                            className="group flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-300 hover:scale-105"
-                            title={`${m.label} (Level ${m.lvl})`}
-                          >
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-2xs relative transition-all duration-300 bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200/60 text-primary">
-                              <MilestoneIcon size={18} className="stroke-[2.5]" />
-                            </div>
-                            <span className="text-[10px] font-extrabold text-surface-650 font-body-md text-center max-w-[65px] truncate">
-                              {m.label}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div className="flex flex-wrap gap-2 p-2">
+                      {equippedMilestones.map((m) => (
+                        <Badge key={m.label} variant="info" size="sm">{m.label}</Badge>
+                      ))}
                     </div>
                   )}
                 </div>

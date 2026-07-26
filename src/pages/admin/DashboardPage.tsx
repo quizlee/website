@@ -315,7 +315,7 @@ export default function AdminDashboardPage() {
   return (
     <div className="animate-fade-in max-w-7xl mx-auto pb-12">
       {/* Page Title */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-200 pb-4">
+      <div className="hidden sm:flex mb-6 flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-200 pb-4">
         <div>
           <h1 className="text-2xl font-black text-surface-900 font-headline-md flex items-center gap-2.5">
             <BarChart3 size={26} className="text-primary-600" />
@@ -327,56 +327,131 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Top Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Total Students */}
-        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-primary-100 rounded-2xl flex items-center justify-center text-primary-600 shrink-0">
-            <GraduationCap size={24} />
+      {/* Student Current Levels Tracker & Inspector Table */}
+      <Card className="p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-surface-100 pb-5 mb-6">
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+              <Award size={22} />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg text-surface-900">Student Current Level Tracker</h2>
+              <p className="text-xs text-surface-500">Click on any student to inspect detailed quiz & question attempt metrics (daily, weekly, monthly).</p>
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-black text-surface-900">{stats.students}</p>
-            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Total Students</p>
-          </div>
-        </Card>
 
-        {/* Total Teachers */}
-        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0">
-            <Users size={24} />
+          {/* Search & Level Filter */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="w-full sm:w-64">
+              <Input
+                placeholder="Search student..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                leftElement={<Search size={16} className="text-surface-400" />}
+              />
+            </div>
+            <div className="w-full sm:w-44">
+              <Select
+                value={levelFilter}
+                onChange={(e) => setLevelFilter(e.target.value)}
+                options={[
+                  { value: 'all', label: 'All Levels' },
+                  { value: 'level0', label: 'Level 0 (<100 XP)' },
+                  { value: 'level1_9', label: 'Level 1 - 9' },
+                  { value: 'level10_49', label: 'Level 10 - 49' },
+                  { value: 'level50_100', label: 'Level 50+' },
+                ]}
+              />
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-black text-surface-900">{stats.teachers}</p>
-            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Total Teachers</p>
-          </div>
-        </Card>
+        </div>
 
-        {/* Total Schools */}
-        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shrink-0">
-            <School size={24} />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-surface-900">{stats.schools}</p>
-            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Active Schools</p>
-          </div>
-        </Card>
+        {/* Table */}
+        <div className="overflow-x-auto border border-surface-200">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-surface-100/70 border-b border-surface-200 text-xs font-extrabold uppercase text-surface-600 tracking-wider">
+              <tr>
+                <th className="px-5 py-3.5 whitespace-nowrap">Student</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Current Level</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Total XP</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">School / Institution</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-100 bg-white font-body-md">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-10 text-surface-400 font-semibold">
+                    No students found matching the selected filters.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((st) => {
+                  const studentLvl = getLevelFromXP(st.points || 0);
+                  const studentInitials = st.full_name?.[0]?.toUpperCase() || '?';
 
-        {/* Total Questions */}
-        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
-            <BookOpen size={24} />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-surface-900">{stats.questions}</p>
-            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Question Bank</p>
-          </div>
-        </Card>
-      </div>
+                  return (
+                    <tr
+                      key={st.id}
+                      onClick={() => handleOpenStudentModal(st)}
+                      className="hover:bg-primary-50/40 transition-colors cursor-pointer group"
+                      title="Click to view detailed quiz & question attempt stats"
+                    >
+                      {/* Student Info */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            avatarUrl={st.avatar_url}
+                            initials={studentInitials}
+                            className="w-10 h-10 border border-surface-200 shrink-0 text-sm font-extrabold group-hover:scale-105 transition-transform"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-surface-900 truncate group-hover:text-primary transition-colors">
+                              {st.full_name || 'Unnamed Student'}
+                            </p>
+                            <p className="text-xs text-surface-400 truncate">
+                              @{st.username || 'username'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Current Level */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black shadow-2xs select-none border whitespace-nowrap ${
+                          studentLvl === 0
+                            ? 'bg-slate-100 text-slate-600 border-slate-200'
+                            : studentLvl >= 50
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-primary-50 text-primary border-primary-200'
+                        }`}>
+                          <Award size={12} className="shrink-0" />
+                          <span>Level {studentLvl}</span>
+                        </span>
+                      </td>
+
+                      {/* Total XP */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <span className="font-extrabold text-warning-700 bg-warning-50 border border-warning-200 px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap">
+                          {(st.points || 0).toLocaleString()} XP
+                        </span>
+                      </td>
+
+                      {/* School / Institution */}
+                      <td className="px-5 py-3.5 text-xs font-bold text-surface-600 truncate max-w-[180px] whitespace-nowrap" title={st.school_name}>
+                        {st.school_name}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Quiz Attempt Breakdown Section (Per Day, This Week, This Month) */}
-      <Card className="p-6 mb-8">
-        <div className="flex items-center gap-3 border-b border-surface-100 pb-4 mb-6">
+      <Card className="p-6 mb-6">
+        <div className="hidden sm:flex items-center gap-3 border-b border-surface-100 pb-4 mb-6">
           <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
             <TrendingUp size={22} />
           </div>
@@ -461,141 +536,52 @@ export default function AdminDashboardPage() {
         </div>
       </Card>
 
-      {/* Student Current Levels Tracker & Inspector Table */}
-      <Card className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-surface-100 pb-5 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
-              <Award size={22} />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-surface-900">Student Current Level Tracker</h2>
-              <p className="text-xs text-surface-500">Click on any student to inspect detailed quiz & question attempt metrics (daily, weekly, monthly).</p>
-            </div>
+      {/* Top Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Students */}
+        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 bg-primary-100 rounded-2xl flex items-center justify-center text-primary-600 shrink-0">
+            <GraduationCap size={24} />
           </div>
-
-          {/* Search & Level Filter */}
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="w-full sm:w-64">
-              <Input
-                placeholder="Search student..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                leftElement={<Search size={16} className="text-surface-400" />}
-              />
-            </div>
-            <div className="w-full sm:w-44">
-              <Select
-                value={levelFilter}
-                onChange={(e) => setLevelFilter(e.target.value)}
-                options={[
-                  { value: 'all', label: 'All Levels' },
-                  { value: 'level0', label: 'Level 0 (<100 XP)' },
-                  { value: 'level1_9', label: 'Level 1 - 9' },
-                  { value: 'level10_49', label: 'Level 10 - 49' },
-                  { value: 'level50_100', label: 'Level 50+' },
-                ]}
-              />
-            </div>
+          <div>
+            <p className="text-2xl font-black text-surface-900">{stats.students}</p>
+            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Total Students</p>
           </div>
-        </div>
+        </Card>
 
-        {/* Table */}
-        <div className="overflow-x-auto rounded-xl border border-surface-200">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface-100/70 border-b border-surface-200 text-xs font-extrabold uppercase text-surface-600 tracking-wider">
-              <tr>
-                <th className="px-5 py-3.5">Student</th>
-                <th className="px-5 py-3.5">Current Level</th>
-                <th className="px-5 py-3.5">Total XP</th>
-                <th className="px-5 py-3.5">Equipped Title</th>
-                <th className="px-5 py-3.5">School / Institution</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100 bg-white font-body-md">
-              {filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-10 text-surface-400 font-semibold">
-                    No students found matching the selected filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredStudents.map((st) => {
-                  const studentLvl = getLevelFromXP(st.points || 0);
-                  const studentInitials = st.full_name?.[0]?.toUpperCase() || '?';
+        {/* Total Teachers */}
+        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0">
+            <Users size={24} />
+          </div>
+          <div>
+            <p className="text-2xl font-black text-surface-900">{stats.teachers}</p>
+            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Total Teachers</p>
+          </div>
+        </Card>
 
-                  return (
-                    <tr
-                      key={st.id}
-                      onClick={() => handleOpenStudentModal(st)}
-                      className="hover:bg-primary-50/40 transition-colors cursor-pointer group"
-                      title="Click to view detailed quiz & question attempt stats"
-                    >
-                      {/* Student Info */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <Avatar
-                            avatarUrl={st.avatar_url}
-                            initials={studentInitials}
-                            className="w-10 h-10 border border-surface-200 shrink-0 text-sm font-extrabold group-hover:scale-105 transition-transform"
-                          />
-                          <div className="min-w-0">
-                            <p className="font-extrabold text-surface-900 truncate group-hover:text-primary transition-colors">
-                              {st.full_name || 'Unnamed Student'}
-                            </p>
-                            <p className="text-xs text-surface-400 truncate">
-                              @{st.username || 'username'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
+        {/* Total Schools */}
+        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shrink-0">
+            <School size={24} />
+          </div>
+          <div>
+            <p className="text-2xl font-black text-surface-900">{stats.schools}</p>
+            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Active Schools</p>
+          </div>
+        </Card>
 
-                      {/* Current Level */}
-                      <td className="px-5 py-3.5">
-                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black shadow-2xs select-none border ${
-                          studentLvl === 0
-                            ? 'bg-slate-100 text-slate-600 border-slate-200'
-                            : studentLvl >= 50
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-primary-50 text-primary border-primary-200'
-                        }`}>
-                          <Award size={12} />
-                          Level {studentLvl}
-                        </span>
-                      </td>
-
-                      {/* Total XP */}
-                      <td className="px-5 py-3.5">
-                        <span className="font-extrabold text-warning-700 bg-warning-50 border border-warning-200 px-2.5 py-0.5 rounded-full text-xs">
-                          {(st.points || 0).toLocaleString()} XP
-                        </span>
-                      </td>
-
-                      {/* Equipped Title */}
-                      <td className="px-5 py-3.5">
-                        {st.title ? (
-                          <span className="text-xs font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                            {st.title}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-400 italic">
-                            No Title Equipped
-                          </span>
-                        )}
-                      </td>
-
-                      {/* School / Institution */}
-                      <td className="px-5 py-3.5 text-xs font-bold text-surface-600 truncate max-w-[180px]" title={st.school_name}>
-                        {st.school_name}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+        {/* Total Questions */}
+        <Card className="flex items-center gap-4 p-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+            <BookOpen size={24} />
+          </div>
+          <div>
+            <p className="text-2xl font-black text-surface-900">{stats.questions}</p>
+            <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">Question Bank</p>
+          </div>
+        </Card>
+      </div>
 
       {/* STUDENT PERFORMANCE DETAILS MODAL */}
       {selectedStudent && (
@@ -654,116 +640,7 @@ export default function AdminDashboardPage() {
               </div>
             ) : studentMetrics ? (
               <div className="space-y-6">
-                {/* 1. QUIZ ATTEMPTED BREAKDOWN */}
-                <div>
-                  <h3 className="font-bold text-sm text-surface-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Activity size={16} className="text-primary-600" />
-                    Quiz Attempts Breakdown (Per Day, Week, Month)
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-center">
-                      <span className="text-[10px] font-extrabold uppercase text-blue-700 tracking-wider block">Today (Per Day)</span>
-                      <p className="text-2xl font-black text-blue-950 mt-1">{studentMetrics.todayQuiz}</p>
-                      <span className="text-[10px] text-blue-600 font-bold">Quiz Attempted</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-center">
-                      <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider block">This Week</span>
-                      <p className="text-2xl font-black text-indigo-950 mt-1">{studentMetrics.weekQuiz}</p>
-                      <span className="text-[10px] text-indigo-600 font-bold">Quiz Attempted</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 text-center">
-                      <span className="text-[10px] font-extrabold uppercase text-purple-700 tracking-wider block">This Month</span>
-                      <p className="text-2xl font-black text-purple-950 mt-1">{studentMetrics.monthQuiz}</p>
-                      <span className="text-[10px] text-purple-600 font-bold">Quiz Attempted</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-center">
-                      <span className="text-[10px] font-extrabold uppercase text-emerald-700 tracking-wider block">All-Time Total</span>
-                      <p className="text-2xl font-black text-emerald-950 mt-1">{studentMetrics.totalQuiz}</p>
-                      <span className="text-[10px] text-emerald-600 font-bold">Quiz Attempted</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. QUESTIONS ATTEMPTED, CORRECT & FAILED BREAKDOWN */}
-                <div>
-                  <h3 className="font-bold text-sm text-surface-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <HelpCircle size={16} className="text-amber-600" />
-                    Questions Attempted, Correct & Failed Analysis
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Per Day */}
-                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">Today (Per Day)</span>
-                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
-                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
-                        <span className="font-black text-surface-950">{studentMetrics.todayQAttempted} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
-                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
-                        <span className="font-black">{studentMetrics.todayQCorrect} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
-                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
-                        <span className="font-black">{studentMetrics.todayQFailed} Questions</span>
-                      </div>
-                    </div>
-
-                    {/* This Week */}
-                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">This Week</span>
-                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
-                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
-                        <span className="font-black text-surface-950">{studentMetrics.weekQAttempted} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
-                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
-                        <span className="font-black">{studentMetrics.weekQCorrect} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
-                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
-                        <span className="font-black">{studentMetrics.weekQFailed} Questions</span>
-                      </div>
-                    </div>
-
-                    {/* This Month */}
-                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">This Month</span>
-                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
-                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
-                        <span className="font-black text-surface-950">{studentMetrics.monthQAttempted} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
-                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
-                        <span className="font-black">{studentMetrics.monthQCorrect} Questions</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
-                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
-                        <span className="font-black">{studentMetrics.monthQFailed} Questions</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Summary accuracy banner */}
-                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-primary-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center border border-emerald-200 shrink-0">
-                        <CheckCircle2 size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-extrabold text-emerald-950">Overall Accuracy Rate</p>
-                        <p className="text-xs text-emerald-700">{studentMetrics.totalCorrect} Correct out of {studentMetrics.totalQAttempted} Total Questions</p>
-                      </div>
-                    </div>
-                    <span className="text-2xl font-black text-emerald-700 font-headline-md">
-                      {studentMetrics.accuracy}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. RECENT ACTIVITY LOG FOR THIS STUDENT */}
+                {/* 1. RECENT ACTIVITY LOG FOR THIS STUDENT */}
                 <div>
                   <h3 className="font-bold text-sm text-surface-900 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Book size={16} className="text-primary-600" />
@@ -837,6 +714,115 @@ export default function AdminDashboardPage() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                {/* 2. OVERALL ACCURACY RATE */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-primary-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center border border-emerald-200 shrink-0">
+                      <CheckCircle2 size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-emerald-950">Overall Accuracy Rate</p>
+                      <p className="text-xs text-emerald-700">{studentMetrics.totalCorrect} Correct out of {studentMetrics.totalQAttempted} Total Questions</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-black text-emerald-700 font-headline-md">
+                    {studentMetrics.accuracy}%
+                  </span>
+                </div>
+
+                {/* 3. QUIZ ATTEMPTED BREAKDOWN */}
+                <div>
+                  <h3 className="font-bold text-sm text-surface-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Activity size={16} className="text-primary-600" />
+                    Quiz Attempts Breakdown (Per Day, Week, Month)
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-center">
+                      <span className="text-[10px] font-extrabold uppercase text-blue-700 tracking-wider block">Today (Per Day)</span>
+                      <p className="text-2xl font-black text-blue-950 mt-1">{studentMetrics.todayQuiz}</p>
+                      <span className="text-[10px] text-blue-600 font-bold">Quiz Attempted</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-center">
+                      <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider block">This Week</span>
+                      <p className="text-2xl font-black text-indigo-950 mt-1">{studentMetrics.weekQuiz}</p>
+                      <span className="text-[10px] text-indigo-600 font-bold">Quiz Attempted</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 text-center">
+                      <span className="text-[10px] font-extrabold uppercase text-purple-700 tracking-wider block">This Month</span>
+                      <p className="text-2xl font-black text-purple-950 mt-1">{studentMetrics.monthQuiz}</p>
+                      <span className="text-[10px] text-purple-600 font-bold">Quiz Attempted</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-center">
+                      <span className="text-[10px] font-extrabold uppercase text-emerald-700 tracking-wider block">All-Time Total</span>
+                      <p className="text-2xl font-black text-emerald-950 mt-1">{studentMetrics.totalQuiz}</p>
+                      <span className="text-[10px] text-emerald-600 font-bold">Quiz Attempted</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. QUESTIONS ATTEMPTED, CORRECT & FAILED BREAKDOWN */}
+                <div>
+                  <h3 className="font-bold text-sm text-surface-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <HelpCircle size={16} className="text-amber-600" />
+                    Questions Attempted, Correct & Failed Analysis
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Per Day */}
+                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">Today (Per Day)</span>
+                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
+                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
+                        <span className="font-black text-surface-950">{studentMetrics.todayQAttempted} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
+                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
+                        <span className="font-black">{studentMetrics.todayQCorrect} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
+                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
+                        <span className="font-black">{studentMetrics.todayQFailed} Questions</span>
+                      </div>
+                    </div>
+
+                    {/* This Week */}
+                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">This Week</span>
+                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
+                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
+                        <span className="font-black text-surface-950">{studentMetrics.weekQAttempted} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
+                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
+                        <span className="font-black">{studentMetrics.weekQCorrect} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
+                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
+                        <span className="font-black">{studentMetrics.weekQFailed} Questions</span>
+                      </div>
+                    </div>
+
+                    {/* This Month */}
+                    <div className="p-4 rounded-2xl border border-surface-200 bg-surface-50/50 space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase text-surface-500 tracking-wider block border-b border-surface-200 pb-1 mb-1.5">This Month</span>
+                      <div className="flex items-center justify-between text-xs font-bold text-surface-800">
+                        <span className="flex items-center gap-1.5 text-surface-600"><FileText size={14} /> Attempted:</span>
+                        <span className="font-black text-surface-950">{studentMetrics.monthQAttempted} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
+                        <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Correct:</span>
+                        <span className="font-black">{studentMetrics.monthQCorrect} Questions</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-rose-600">
+                        <span className="flex items-center gap-1.5"><XCircle size={14} /> Failed / Incorrect:</span>
+                        <span className="font-black">{studentMetrics.monthQFailed} Questions</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

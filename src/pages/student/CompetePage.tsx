@@ -16,6 +16,7 @@ import {
   Calculator,
   Monitor,
   Ticket,
+  Share2,
 } from 'lucide-react';
 
 interface Chapter {
@@ -249,12 +250,18 @@ export default function CompetePage() {
             <Trophy className="text-primary" size={32} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-surface-900 tracking-tight">Compete Arena</h2>
-            <p className="text-sm font-semibold text-primary-600 uppercase tracking-widest mt-1">Coming Soon</p>
+            <h2 className="text-2xl font-black text-surface-900 tracking-tight">Competitive Matches</h2>
           </div>
-          <p className="text-xs text-surface-500 font-medium leading-relaxed">
-            Get ready to match up against your classmates, climb the leaderboard, and claim the championship!
-          </p>
+          <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-amber-900 font-extrabold text-xs max-w-xs leading-relaxed shadow-3xs">
+            Share with your School Friends to participate in Competitive matches & reveal your School Rank!
+          </div>
+          <button
+            onClick={() => navigate('/student/friends', { state: { showInvite: true } })}
+            className="w-full mt-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-600 hover:to-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-2xl shadow-md shadow-primary/20 hover:shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer text-xs"
+          >
+            <Share2 size={14} />
+            <span>Share & Invite Friends</span>
+          </button>
         </div>
       </div>
       <div className="space-y-6">
