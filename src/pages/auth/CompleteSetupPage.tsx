@@ -8,7 +8,7 @@ import { Select } from '../../components/ui/Select';
 import { Card } from '../../components/ui/Card';
 import { toast } from '../../components/ui/Toast';
 import type { School, Class } from '../../lib/types';
-import { School as SchoolIcon, GraduationCap, BookOpen, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { School as SchoolIcon, GraduationCap, BookOpen } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 
 export default function CompleteSetupPage() {
@@ -17,21 +17,12 @@ export default function CompleteSetupPage() {
   const [loading, setLoading] = useState(false);
 
   // Form states
-  const [role, setRole] = useState<'student' | 'teacher'>(() => {
-    const saved = localStorage.getItem('oauth_signup_role');
-    return saved === 'teacher' ? 'teacher' : 'student';
-  });
+  const [role, setRole] = useState<'student' | 'teacher'>('student');
   const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
   const [gender, setGender] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  // const [dateOfBirth, setDateOfBirth] = useState(''); // removed per requirements
   const [schoolId, setSchoolId] = useState('');
   const [classId, setClassId] = useState('');
-  const [isUsernameEdited, setIsUsernameEdited] = useState(false);
-
-  // Live username check state
-  const [checkingUsername, setCheckingUsername] = useState(false);
-  const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
 
   // Data lists
   const [schools, setSchools] = useState<School[]>([]);
@@ -58,12 +49,10 @@ export default function CompleteSetupPage() {
         return;
       }
 
-      // Pre-fill fields
+      // Pre-fill fields (username & DOB removed per requirements)
       const meta = user.user_metadata;
       setFullName(profile?.full_name || meta?.full_name || meta?.name || localStorage.getItem('quizlee_last_google_name') || '');
-      setUsername(profile?.username || '');
       setGender(profile?.gender || meta?.gender || '');
-      setDateOfBirth(profile?.date_of_birth || meta?.date_of_birth || meta?.birthdate || '');
       setSchoolId(profile?.school_id || '');
       setClassId(profile?.class_id || '');
       if (profile?.role) {
@@ -72,54 +61,9 @@ export default function CompleteSetupPage() {
     }
   }, [user, profile, initialized, authLoading, navigate]);
 
-  // Sync username from full name if not already set and not manually edited
-  useEffect(() => {
-    if (!isUsernameEdited && !username && fullName) {
-      const firstName = fullName.trim().split(/\s+/)[0] || '';
-      setUsername(firstName.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    }
-  }, [fullName, username, isUsernameEdited]);
+  // (Username sync removed; username is generated on submit)
 
-  // Live username availability check
-  useEffect(() => {
-    if (!username) {
-      setIsUsernameAvailable(null);
-      return;
-    }
-
-    if (username.length < 3) {
-      setIsUsernameAvailable(false);
-      return;
-    }
-
-    if (profile?.username === username) {
-      setIsUsernameAvailable(true);
-      return;
-    }
-
-    setCheckingUsername(true);
-    const timer = setTimeout(async () => {
-      try {
-        const { data: exists, error } = await supabase.rpc('check_username_exists', {
-          username_to_check: username,
-        });
-
-        if (error) {
-          console.error('Error checking username:', error);
-          setIsUsernameAvailable(null);
-        } else {
-          setIsUsernameAvailable(!exists);
-        }
-      } catch (err) {
-        console.error('Failed to verify username availability:', err);
-        setIsUsernameAvailable(null);
-      } finally {
-        setCheckingUsername(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [username, profile?.username]);
+  // (Live username availability check removed per requirements)
 
   // Fetch active schools
   useEffect(() => {
@@ -161,10 +105,6 @@ export default function CompleteSetupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-    if (isUsernameAvailable === false) {
-      toast('Please choose a different username', 'error');
-      return;
-    }
     setLoading(true);
 
     try {
@@ -178,9 +118,10 @@ export default function CompleteSetupPage() {
       const profileData = {
         role,
         full_name: fullName,
-        username,
+        // Generate a simple username from the first part of full name
+        username: fullName.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, ''),
         gender: gender || null,
-        date_of_birth: dateOfBirth || null,
+        date_of_birth: null,
         school_id: (role === 'student' || role === 'teacher') ? schoolId : null,
         class_id: role === 'student' ? classId : null,
         verification_status: role === 'teacher' ? 'pending' : null,
@@ -276,36 +217,7 @@ export default function CompleteSetupPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Role picker */}
-            <div>
-              <p className="text-sm font-semibold text-surface-700 mb-2">I am a...</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRole('student')}
-                  className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 cursor-pointer
-                    ${role === 'student'
-                      ? 'border-primary-500 bg-primary-50 shadow-md'
-                      : 'border-surface-200 hover:border-surface-300 hover:bg-surface-50'
-                    }`}
-                >
-                  <GraduationCap size={28} className={`mx-auto mb-1 ${role === 'student' ? 'text-primary-600' : 'text-surface-400'}`} />
-                  <p className={`font-bold text-sm ${role === 'student' ? 'text-primary-700' : 'text-surface-600'}`}>Student</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('teacher')}
-                  className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 cursor-pointer
-                    ${role === 'teacher'
-                      ? 'border-secondary-500 bg-secondary-50 shadow-md'
-                      : 'border-surface-200 hover:border-surface-300 hover:bg-surface-50'
-                    }`}
-                >
-                  <BookOpen size={28} className={`mx-auto mb-1 ${role === 'teacher' ? 'text-secondary-600' : 'text-surface-400'}`} />
-                  <p className={`font-bold text-sm ${role === 'teacher' ? 'text-secondary-700' : 'text-surface-600'}`}>Teacher</p>
-                </button>
-              </div>
-            </div>
+            {/* Role picker hidden */}
 
             <Input
               label="Full Name"
@@ -313,55 +225,6 @@ export default function CompleteSetupPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-            />
-
-            <div className="relative">
-              <span className="absolute left-4 top-[38px] text-surface-400 font-semibold select-none">
-                @
-              </span>
-              <Input
-                label="Username"
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                  setIsUsernameEdited(true);
-                }}
-                required
-                className="pl-8 pr-10"
-                error={!username ? 'Username is required' : (isUsernameAvailable === false ? (username.length < 3 ? 'Username must be at least 3 characters' : 'Username is already taken') : undefined)}
-                helpText={isUsernameAvailable === true && username ? 'Username is available' : undefined}
-              />
-              <div className="absolute right-3 top-[38px] flex items-center justify-center pointer-events-none">
-                {checkingUsername && (
-                  <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
-                )}
-                {!checkingUsername && isUsernameAvailable === true && (
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                )}
-                {!checkingUsername && isUsernameAvailable === false && (
-                  <XCircle className="w-5 h-5 text-red-500" />
-                )}
-              </div>
-            </div>
-
-            <Select
-              label="Gender"
-              placeholder="Select gender"
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              options={[
-                { value: 'male', label: 'Male' },
-                { value: 'female', label: 'Female' },
-                { value: 'other', label: 'Other' },
-              ]}
-            />
-
-            <Input
-              label="Date of Birth"
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
             />
 
             {(role === 'student' || role === 'teacher') && (
@@ -390,8 +253,7 @@ export default function CompleteSetupPage() {
             <Button
               type="submit"
               size="lg"
-              loading={loading || checkingUsername}
-              disabled={isUsernameAvailable === false}
+              loading={loading}
               icon={<SchoolIcon size={18} />}
               className="w-full mt-2"
             >

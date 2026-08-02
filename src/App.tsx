@@ -9,7 +9,7 @@ import { Spinner } from './components/ui/Spinner';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
+
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import CompleteSetupPage from './pages/auth/CompleteSetupPage';
 
@@ -134,7 +134,7 @@ export default function App() {
 
         {/* Public / Auth routes */}
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/complete-setup" element={<CompleteSetupPage />} />
 
