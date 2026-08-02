@@ -8,7 +8,7 @@ import { Select } from '../../components/ui/Select';
 import { Card } from '../../components/ui/Card';
 import { toast } from '../../components/ui/Toast';
 import type { School, Class } from '../../lib/types';
-import { School as SchoolIcon, GraduationCap, BookOpen } from 'lucide-react';
+import { School as SchoolIcon, GraduationCap } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 
 export default function CompleteSetupPage() {

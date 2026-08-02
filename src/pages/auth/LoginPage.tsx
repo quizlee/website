@@ -31,7 +31,7 @@ export default function LoginPage() {
     const error = searchParams.get('error') || hashParams.get('error');
     const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
     if (error || errorDescription) {
-      toast.error(errorDescription || error || 'Authentication failed');
+      toast(errorDescription || error || 'Authentication failed', 'error');
       navigate(window.location.pathname, { replace: true });
     }
   }, [navigate]);
@@ -55,7 +55,7 @@ export default function LoginPage() {
       options: { redirectTo: window.location.origin },
     });
     if (error) {
-      toast.error(error.message);
+toast(error.message, 'error');
       setGoogleLoading(false);
     }
   }
