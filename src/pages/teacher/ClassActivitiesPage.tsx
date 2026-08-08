@@ -128,9 +128,6 @@ export default function TeacherClassActivitiesPage() {
   // Close dropdowns on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
       if (filterChapterRef.current && !filterChapterRef.current.contains(event.target as Node)) {
         setFilterChapterDropdownOpen(false);
       }
