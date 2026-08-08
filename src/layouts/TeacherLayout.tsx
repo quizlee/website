@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { supabase } from '../lib/supabase';
+import { Avatar } from '../components/ui/Avatar';
 import {
   LayoutDashboard,
   FileText,
@@ -68,13 +69,11 @@ export default function TeacherLayout() {
         {/* User */}
         <div className="p-4 border-t border-surface-100">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-secondary-100 flex items-center justify-center text-secondary-600 font-bold overflow-hidden">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                profile?.full_name?.[0]?.toUpperCase() || '?'
-              )}
-            </div>
+            <Avatar
+              avatarUrl={profile?.avatar_url || null}
+              initials={profile?.full_name?.[0]?.toUpperCase() || '?'}
+              className="w-10 h-10 text-sm font-bold shrink-0"
+            />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-surface-800 truncate">
                 {profile?.full_name || 'Teacher'}

@@ -25,10 +25,11 @@ import ActivityPanelPage from './pages/student/ActivityPanelPage';
 import PlayPage from './pages/student/PlayPage';
 import ResultPage from './pages/student/ResultPage';
 import LeaderboardPage from './pages/student/LeaderboardPage';
-import CompetePage from './pages/student/CompetePage';
+import CompetitivePage from './pages/student/CompetitivePage';
 import SettingsPage from './pages/student/SettingsPage';
 import FriendsPage from './pages/student/FriendsPage';
 import StudentClassActivitiesPage from './pages/student/ClassActivitiesPage';
+import RecentPage from './pages/student/RecentPage';
 import { getSavedTheme, applyTheme } from './lib/theme';
 
 // Teacher Pages
@@ -43,13 +44,11 @@ import TeacherClassActivitiesPage from './pages/teacher/ClassActivitiesPage';
 import SetupPage from './pages/admin/SetupPage';
 import AdminDashboardPage from './pages/admin/DashboardPage';
 import TeacherVerificationPage from './pages/admin/TeacherVerificationPage';
-import CurriculumPage from './pages/admin/CurriculumPage';
 import ContentOversightPage from './pages/admin/ContentOversightPage';
 import ActivityManagerPage from './pages/admin/ActivityManagerPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import AdminLeaderboardPage from './pages/admin/LeaderboardPage';
 import ActivityLogPage from './pages/admin/ActivityLogPage';
-import AdminBulkImportPage from './pages/admin/BulkImportPage';
 import AdminSettingsPage from './pages/admin/SettingsPage';
 
 function RootRedirector() {
@@ -156,7 +155,9 @@ export default function App() {
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="class-activities" element={<StudentClassActivitiesPage />} />
           <Route path="friends" element={<FriendsPage />} />
-          <Route path="compete" element={<CompetePage />} />
+          <Route path="competitive" element={<CompetitivePage />} />
+          <Route path="compete" element={<Navigate to="/student/competitive" replace />} />
+          <Route path="recent" element={<RecentPage />} />
           <Route path="account" element={<SettingsPage key="account" defaultTab="profile_view" />} />
           <Route path="settings" element={<SettingsPage key="settings" defaultTab="profile_view" />} />
         </Route>
@@ -196,10 +197,10 @@ export default function App() {
         >
           <Route index element={<AdminDashboardPage />} />
           <Route path="teachers" element={<TeacherVerificationPage />} />
-          <Route path="curriculum" element={<CurriculumPage />} />
+          <Route path="curriculum" element={<Navigate to="/1234/admin/content" replace />} />
           <Route path="activities" element={<ActivityManagerPage />} />
           <Route path="content" element={<ContentOversightPage />} />
-          <Route path="import" element={<AdminBulkImportPage />} />
+          <Route path="import" element={<Navigate to="/1234/admin/content" replace />} />
           <Route path="users" element={<UserManagementPage />} />
           <Route path="leaderboard" element={<AdminLeaderboardPage />} />
           <Route path="activity-log" element={<ActivityLogPage />} />

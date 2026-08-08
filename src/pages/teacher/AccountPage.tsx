@@ -260,13 +260,11 @@ export default function TeacherAccountPage() {
           <Card className="text-center">
             <div className="flex flex-col items-center">
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-secondary-100 flex items-center justify-center text-4xl font-bold text-secondary-600 overflow-hidden shadow-inner">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    profile?.full_name?.[0]?.toUpperCase() || '?'
-                  )}
-                </div>
+                <Avatar
+                  avatarUrl={profile?.avatar_url || null}
+                  initials={profile?.full_name?.[0]?.toUpperCase() || '?'}
+                  className="w-24 h-24 text-3xl font-bold shadow-inner"
+                />
                 <label className="absolute bottom-0 right-0 w-8 h-8 bg-secondary-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-secondary-600 transition-colors">
                   <Camera size={14} className="text-white" />
                   <input

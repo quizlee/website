@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Content, QuizPayload, PlayMode } from '../../lib/types';
+import {
+  getActivePlaySession,
+  updateActivePlaySession,
+  clearActivePlaySession,
+} from '../../lib/playSession';
 
 interface QuizActivityProps {
   content: Content[];
@@ -18,30 +23,59 @@ export function QuizActivity({
   showHints,
 }: QuizActivityProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromUrl = searchParams.get('from');
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(content.length).fill(null));
-  const [hintsShown, setHintsShown] = useState<boolean[]>(() => Array(content.length).fill(false));
+  const handleExit = () => {
+    clearActivePlaySession();
+    if (fromUrl) {
+      navigate(fromUrl);
+    } else {
+      navigate('/student');
+    }
+  };
+
+  const savedSession = getActivePlaySession();
+
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    return savedSession?.currentIndex ?? 0;
+  });
+
+  const [answers, setAnswers] = useState<(number | null)[]>(() => {
+    if (savedSession?.answers && savedSession.answers.length === content.length) {
+      return savedSession.answers;
+    }
+    return Array(content.length).fill(null);
+  });
+
+  const [hintsShown, setHintsShown] = useState<boolean[]>(() => {
+    if (savedSession?.hintsShown && savedSession.hintsShown.length === content.length) {
+      return savedSession.hintsShown;
+    }
+    return Array(content.length).fill(false);
+  });
+
   const [timeLeft, setTimeLeft] = useState(timeLimit || 0);
 
-  const [shuffledIndices, setShuffledIndices] = useState<number[]>(() => {
-    if (content[0]?.payload) {
-      const qPayload = content[0].payload as QuizPayload;
-      if (qPayload.options) {
-        return qPayload.options.map((_, i) => i).sort(() => Math.random() - 0.5);
-      }
-    }
-    return [];
-  });
+  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
 
   const currentQuestion = content[currentIndex];
   const payload = currentQuestion?.payload as QuizPayload;
 
   useEffect(() => {
     if (payload?.options) {
-      const indices = payload.options.map((_, i) => i);
-      const shuffled = [...indices].sort(() => Math.random() - 0.5);
-      setShuffledIndices(shuffled);
+      const session = getActivePlaySession();
+      const optionOrders = session?.optionOrders || {};
+      if (optionOrders[currentIndex] && optionOrders[currentIndex].length === payload.options.length) {
+        setShuffledIndices(optionOrders[currentIndex]);
+      } else {
+        const indices = payload.options.map((_, i) => i);
+        const shuffled = [...indices].sort(() => Math.random() - 0.5);
+        setShuffledIndices(shuffled);
+        updateActivePlaySession({
+          optionOrders: { ...optionOrders, [currentIndex]: shuffled },
+        });
+      }
     }
   }, [currentIndex, payload]);
   const total = content.length;
@@ -71,6 +105,7 @@ export function QuizActivity({
   useEffect(() => {
     if (!timeLimit) return;
     if (timeLeft <= 0) {
+      clearActivePlaySession();
       onComplete(score, total, getCorrectQuestionIds());
       return;
     }
@@ -98,13 +133,17 @@ export function QuizActivity({
     const newAnswers = [...answers];
     newAnswers[currentIndex] = optionIndex;
     setAnswers(newAnswers);
+    updateActivePlaySession({ answers: newAnswers });
   }
 
   function handleNext() {
     if (currentIndex + 1 >= total) {
+      clearActivePlaySession();
       onComplete(score, total, getCorrectQuestionIds());
     } else {
-      setCurrentIndex((prev) => prev + 1);
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      updateActivePlaySession({ currentIndex: nextIdx });
     }
   }
 
@@ -117,9 +156,12 @@ export function QuizActivity({
 
     // If it's the last question, show the result screen immediately
     if (currentIndex + 1 >= total) {
+      clearActivePlaySession();
       onComplete(score, total, getCorrectQuestionIds());
     } else {
-      setCurrentIndex((prev) => prev + 1);
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      updateActivePlaySession({ currentIndex: nextIdx, answers: newAnswers });
     }
   }
 
@@ -139,7 +181,7 @@ export function QuizActivity({
         <div className="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-4 flex justify-between items-center w-full">
           <div className="flex items-center gap-8">
             <h1 
-              onClick={() => navigate('/student')}
+              onClick={handleExit}
               className="font-headline-md text-headline-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary tracking-tight filter drop-shadow-sm cursor-pointer select-none"
             >
               Quizlee
@@ -194,6 +236,7 @@ export function QuizActivity({
                     const newHints = [...hintsShown];
                     newHints[currentIndex] = true;
                     setHintsShown(newHints);
+                    updateActivePlaySession({ hintsShown: newHints });
                   }}
                   className="flex items-center gap-1.5 text-sm text-amber-600 font-bold hover:text-amber-700 cursor-pointer hover:scale-105 transition-transform font-quicksand"
                 >
@@ -313,7 +356,7 @@ export function QuizActivity({
           {/* Left Group: Quit Quiz & Skip */}
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate('/student/practice')}
+              onClick={handleExit}
               className="flex items-center justify-center gap-2 w-10 h-10 sm:w-auto sm:px-5 sm:py-2.5 rounded-full font-bold select-none transition-all text-sm bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 cursor-pointer"
               title="Quit Quiz"
             >

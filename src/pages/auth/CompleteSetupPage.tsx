@@ -125,7 +125,7 @@ export default function CompleteSetupPage() {
         school_id: (role === 'student' || role === 'teacher') ? schoolId : null,
         class_id: role === 'student' ? classId : null,
         verification_status: role === 'teacher' ? 'pending' : null,
-        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || localStorage.getItem('quizlee_last_google_avatar') || null,
       };
 
       let updateError;

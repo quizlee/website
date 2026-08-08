@@ -353,6 +353,7 @@ export default function ClassActivitiesPage() {
                             params.set('type', share.activity_type!);
                             params.set('mode', 'practice');
                             params.set('share_id', share.id);
+                            params.set('from', '/student/class-activities');
                             navigate(`/student/play?${params.toString()}`);
                           }}
                           icon={isCompleted ? <Play size={16} /> : <Play size={16} />}

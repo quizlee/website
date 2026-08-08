@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [detectedGoogleName, setDetectedGoogleName] = useState<string | null>(null);
   const [detectedGoogleEmail, setDetectedGoogleEmail] = useState<string | null>(null);
   const [detectedGoogleAvatar, setDetectedGoogleAvatar] = useState<string | null>(null);
+  const [googleAvatarError, setGoogleAvatarError] = useState(false);
 
   // Load persisted Google account info
   useEffect(() => {
@@ -85,8 +86,14 @@ toast(error.message, 'error');
               <p className="text-sm text-gray-600">Last signed in as</p>
             </div>
             <div className="flex items-center gap-4 p-4 bg-white/50 border border-white/30 rounded-xl mb-5">
-              {detectedGoogleAvatar ? (
-                <img src={detectedGoogleAvatar} alt={detectedGoogleName} className="w-12 h-12 rounded-full object-cover shadow-sm" />
+              {detectedGoogleAvatar && !googleAvatarError ? (
+                <img
+                  src={detectedGoogleAvatar}
+                  alt={detectedGoogleName}
+                  className="w-12 h-12 rounded-full object-cover shadow-sm"
+                  referrerPolicy="no-referrer"
+                  onError={() => setGoogleAvatarError(true)}
+                />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-800 font-bold text-xl">
                   {detectedGoogleName.charAt(0).toUpperCase()}

@@ -3,6 +3,11 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import type { Content, PicturePayload, PlayMode } from '../../lib/types';
 import { Timer, ChevronRight } from 'lucide-react';
+import {
+  getActivePlaySession,
+  updateActivePlaySession,
+  clearActivePlaySession,
+} from '../../lib/playSession';
 
 interface PictureGameActivityProps {
   content: Content[];
@@ -18,12 +23,13 @@ export function PictureGameActivity({
   onComplete,
   timeLimit,
 }: PictureGameActivityProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const savedSession = getActivePlaySession();
+  const [currentIndex, setCurrentIndex] = useState<number>(() => savedSession?.currentIndex ?? 0);
+  const [score, setScore] = useState<number>(() => savedSession?.score ?? 0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(() => savedSession?.selectedAnswer ?? null);
+  const [showResult, setShowResult] = useState<boolean>(() => savedSession?.showResult ?? false);
   const [timeLeft, setTimeLeft] = useState(timeLimit || 0);
-  const [correctQuestionIds, setCorrectQuestionIds] = useState<string[]>([]);
+  const [correctQuestionIds, setCorrectQuestionIds] = useState<string[]>(() => savedSession?.correctQuestionIds ?? []);
 
   const total = content.length;
   const currentItem = content[currentIndex];
@@ -34,6 +40,7 @@ export function PictureGameActivity({
   useEffect(() => {
     if (!timeLimit) return;
     if (timeLeft <= 0) {
+      clearActivePlaySession();
       onComplete(score, total, correctQuestionIds);
       return;
     }
@@ -45,20 +52,36 @@ export function PictureGameActivity({
     if (showResult) return;
     setSelectedAnswer(optionIndex);
     setShowResult(true);
+    let nextScore = score;
+    let nextCorrect = [...correctQuestionIds];
     if (optionIndex === payload.correct_answer) {
-      setScore((prev) => prev + 1);
-      setCorrectQuestionIds((prev) => [...prev, currentItem.id]);
+      nextScore = score + 1;
+      setScore(nextScore);
+      nextCorrect = [...correctQuestionIds, currentItem.id];
+      setCorrectQuestionIds(nextCorrect);
     }
+    updateActivePlaySession({
+      selectedAnswer: optionIndex,
+      showResult: true,
+      score: nextScore,
+      correctQuestionIds: nextCorrect,
+    });
   }
 
   function handleNext() {
     if (currentIndex + 1 >= total) {
-      // If the current question was correct, it's already in correctQuestionIds state
+      clearActivePlaySession();
       onComplete(score, total, correctQuestionIds);
     } else {
-      setCurrentIndex((prev) => prev + 1);
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
       setSelectedAnswer(null);
       setShowResult(false);
+      updateActivePlaySession({
+        currentIndex: nextIdx,
+        selectedAnswer: null,
+        showResult: false,
+      });
     }
   }
 

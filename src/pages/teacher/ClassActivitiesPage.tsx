@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { Card } from '../../components/ui/Card';
@@ -17,7 +17,9 @@ import {
   CheckCircle,
   ExternalLink,
   Calendar,
-  Layers
+  Layers,
+  School as SchoolIcon,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ClassItem {
@@ -77,9 +79,6 @@ export default function TeacherClassActivitiesPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedChapter, setSelectedChapter] = useState('');
   const [activityType, setActivityType] = useState('quiz');
   const [saving, setSaving] = useState(false);
 
@@ -87,10 +86,120 @@ export default function TeacherClassActivitiesPage() {
   const [connectedStudents, setConnectedStudents] = useState<any[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
+  // School & Main Page Curriculum Filter state
+  const [schoolName, setSchoolName] = useState('');
+  const [filterClass, setFilterClass] = useState(() => localStorage.getItem('teacher_class_activities_class') || '');
+  const [filterSubject, setFilterSubject] = useState(() => localStorage.getItem('teacher_class_activities_subject') || '');
+  const [filterChapterIds, setFilterChapterIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('teacher_class_activities_chapters');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [filterSubjects, setFilterSubjects] = useState<SubjectItem[]>([]);
+  const [filterChapters, setFilterChapters] = useState<ChapterItem[]>([]);
+
+  const [filterChapterDropdownOpen, setFilterChapterDropdownOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const filterChapterRef = useRef<HTMLDivElement>(null);
+
+  // Persist curriculum filters to localStorage
+  useEffect(() => {
+    if (filterClass) {
+      localStorage.setItem('teacher_class_activities_class', filterClass);
+    } else {
+      localStorage.removeItem('teacher_class_activities_class');
+    }
+  }, [filterClass]);
+
+  useEffect(() => {
+    if (filterSubject) {
+      localStorage.setItem('teacher_class_activities_subject', filterSubject);
+    } else {
+      localStorage.removeItem('teacher_class_activities_subject');
+    }
+  }, [filterSubject]);
+
+  useEffect(() => {
+    localStorage.setItem('teacher_class_activities_chapters', JSON.stringify(filterChapterIds));
+  }, [filterChapterIds]);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+      if (filterChapterRef.current && !filterChapterRef.current.contains(event.target as Node)) {
+        setFilterChapterDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Curriculum lists for dropdowns
   const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
-  const [chapters, setChapters] = useState<ChapterItem[]>([]);
+
+  // Fetch school name
+  useEffect(() => {
+    if (!profile?.school_id) return;
+    supabase
+      .from('schools')
+      .select('name')
+      .eq('id', profile.school_id)
+      .single()
+      .then(({ data }) => {
+        if (data) setSchoolName(data.name);
+      });
+  }, [profile?.school_id]);
+
+  // Fetch filter subjects when filterClass changes
+  useEffect(() => {
+    if (!filterClass) {
+      setFilterSubjects([]);
+      setFilterSubject('');
+      setFilterChapterIds([]);
+      return;
+    }
+    let query = supabase.from('subjects').select('id, name').eq('class_id', filterClass);
+    if (profile?.school_id) {
+      query = query.eq('school_id', profile.school_id);
+    }
+    query.order('name').then(({ data }) => {
+      if (data) {
+        setFilterSubjects(data);
+        if (filterSubject && !data.some(s => s.id === filterSubject)) {
+          setFilterSubject('');
+          setFilterChapterIds([]);
+        }
+      }
+    });
+  }, [filterClass, profile?.school_id]);
+
+  // Fetch filter chapters when filterSubject changes
+  useEffect(() => {
+    if (!filterSubject) {
+      setFilterChapters([]);
+      setFilterChapterIds([]);
+      return;
+    }
+    supabase
+      .from('chapters')
+      .select('id, name')
+      .eq('subject_id', filterSubject)
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) {
+          setFilterChapters(data);
+          // Keep only saved filter chapters that are valid for the new subject
+          setFilterChapterIds(prev => prev.filter(id => data.some(ch => ch.id === id)));
+        }
+      });
+  }, [filterSubject]);
 
   useEffect(() => {
     fetchData();
@@ -132,38 +241,7 @@ export default function TeacherClassActivitiesPage() {
     }
   }
 
-  useEffect(() => {
-    if (!selectedClass) {
-      setSubjects([]);
-      setSelectedSubject('');
-      return;
-    }
-    supabase
-      .from('subjects')
-      .select('id, name')
-      .eq('class_id', selectedClass)
-      .eq('school_id', profile?.school_id)
-      .order('name')
-      .then(({ data }) => {
-        if (data) setSubjects(data);
-      });
-  }, [selectedClass, profile]);
 
-  useEffect(() => {
-    if (!selectedSubject) {
-      setChapters([]);
-      setSelectedChapter('');
-      return;
-    }
-    supabase
-      .from('chapters')
-      .select('id, name')
-      .eq('subject_id', selectedSubject)
-      .order('sort_order')
-      .then(({ data }) => {
-        if (data) setChapters(data);
-      });
-  }, [selectedSubject]);
 
   async function fetchData() {
     if (!profile?.id) return;
@@ -223,8 +301,8 @@ export default function TeacherClassActivitiesPage() {
       toast('URL is required for documents and links', 'error');
       return;
     }
-    if (shareType === 'activity' && (!selectedClass || !selectedSubject || !selectedChapter)) {
-      toast('Please select a Class, Subject, and Chapter for the Activity', 'error');
+    if (shareType === 'activity' && (!selectedClass || !selectedSubject || selectedChapterIds.length === 0)) {
+      toast('Please select a Class, Subject, and at least one Chapter for the Activity', 'error');
       return;
     }
     if (selectedStudentIds.length === 0) {
@@ -234,22 +312,40 @@ export default function TeacherClassActivitiesPage() {
 
     setSaving(true);
     try {
-      const shareData = {
-        teacher_id: profile!.id,
-        title: title.trim(),
-        description: description.trim() || null,
-        type: shareType,
-        url: shareType !== 'activity' ? url.trim() : null,
-        class_id: shareType === 'activity' ? selectedClass : null,
-        subject_id: shareType === 'activity' ? selectedSubject : null,
-        chapter_id: shareType === 'activity' ? selectedChapter : null,
-        activity_type: shareType === 'activity' ? activityType : null,
-        student_ids: selectedStudentIds,
-      };
-
-      const { error } = await supabase.from('teacher_shares').insert(shareData);
-      if (error) throw error;
-
+      if (selectedChapterIds.length > 0) {
+        const promises = selectedChapterIds.map(async (chId) => {
+          const shareData = {
+            teacher_id: profile!.id,
+            title: title.trim(),
+            description: description.trim() || null,
+            type: shareType,
+            url: shareType !== 'activity' ? url.trim() : null,
+            class_id: selectedClass || null,
+            subject_id: selectedSubject || null,
+            chapter_id: chId,
+            activity_type: shareType === 'activity' ? activityType : null,
+            student_ids: selectedStudentIds,
+          };
+          const { error } = await supabase.from('teacher_shares').insert(shareData);
+          if (error) throw error;
+        });
+        await Promise.all(promises);
+      } else {
+        const shareData = {
+          teacher_id: profile!.id,
+          title: title.trim(),
+          description: description.trim() || null,
+          type: shareType,
+          url: shareType !== 'activity' ? url.trim() : null,
+          class_id: selectedClass || null,
+          subject_id: selectedSubject || null,
+          chapter_id: null,
+          activity_type: shareType === 'activity' ? activityType : null,
+          student_ids: selectedStudentIds,
+        };
+        const { error } = await supabase.from('teacher_shares').insert(shareData);
+        if (error) throw error;
+      }
       toast('Resource shared successfully! 🚀', 'success');
       setShowModal(false);
       resetForm();
@@ -277,9 +373,6 @@ export default function TeacherClassActivitiesPage() {
     setTitle('');
     setDescription('');
     setUrl('');
-    setSelectedClass('');
-    setSelectedSubject('');
-    setSelectedChapter('');
     setActivityType('quiz');
     setShareType('activity');
   }
@@ -294,24 +387,129 @@ export default function TeacherClassActivitiesPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-surface-900">Class Activities & Sharing 🏫</h1>
-          <p className="text-surface-500">Share activities, documents, or links with your connected students</p>
+      {/* Curriculum & School Selection Bar (before Shared Materials container) */}
+      <Card padding="sm" className="mb-6 bg-white border border-surface-200 shadow-sm">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-100 pb-2">
+            <div className="flex items-center gap-2">
+              <SchoolIcon size={16} className="text-secondary-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-surface-500">School:</span>
+              <span className="text-xs font-bold text-secondary-700 bg-secondary-50 px-2.5 py-0.5 rounded-full border border-secondary-100">
+                {schoolName || 'Your School'}
+              </span>
+            </div>
+            {(filterClass || filterSubject || filterChapterIds.length > 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterClass('');
+                  setFilterSubject('');
+                  setFilterChapterIds([]);
+                }}
+                className="text-xs text-secondary-650 hover:underline font-bold cursor-pointer"
+              >
+                Clear Filter
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Select Class */}
+            <div>
+              <label className="block text-[10px] font-bold text-surface-500 uppercase tracking-wide mb-1">
+                Select Class
+              </label>
+              <select
+                value={filterClass}
+                onChange={(e) => {
+                  setFilterClass(e.target.value);
+                  setFilterSubject('');
+                  setFilterChapterIds([]);
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-surface-200 bg-surface-50/50 font-semibold text-surface-800 focus:outline-none focus:border-secondary-500 cursor-pointer"
+              >
+                <option value="">All Classes</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Select Subject */}
+            <div>
+              <label className="block text-[10px] font-bold text-surface-500 uppercase tracking-wide mb-1">
+                Select Subject
+              </label>
+              <select
+                value={filterSubject}
+                onChange={(e) => {
+                  setFilterSubject(e.target.value);
+                  setFilterChapterIds([]);
+                }}
+                disabled={!filterClass}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-surface-200 bg-surface-50/50 font-semibold text-surface-800 focus:outline-none focus:border-secondary-500 disabled:opacity-50 cursor-pointer"
+              >
+                <option value="">All Subjects</option>
+                {filterSubjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Select Chapters (Multi-select) */}
+            <div className="relative" ref={filterChapterRef}>
+              <label className="block text-[10px] font-bold text-surface-500 uppercase tracking-wide mb-1">
+                Select Chapters
+              </label>
+              <button
+                type="button"
+                disabled={!filterSubject}
+                onClick={() => setFilterChapterDropdownOpen(!filterChapterDropdownOpen)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-surface-200 bg-surface-50/50 font-semibold text-surface-800 text-left focus:outline-none focus:border-secondary-500 disabled:opacity-50 flex items-center justify-between cursor-pointer"
+              >
+                <span className="truncate">
+                  {filterChapterIds.length === 0
+                    ? 'All Chapters'
+                    : `${filterChapterIds.length} Chapter${filterChapterIds.length > 1 ? 's' : ''} Selected`}
+                </span>
+                <ChevronDown size={14} className="text-surface-450 shrink-0" />
+              </button>
+
+              {filterChapterDropdownOpen && filterSubject && (
+                <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-surface-200 rounded-xl shadow-lg z-50 p-2 space-y-1">
+                  {filterChapters.map((ch) => {
+                    const isChecked = filterChapterIds.includes(ch.id);
+                    return (
+                      <label
+                        key={ch.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold text-surface-700 hover:bg-surface-50 cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setFilterChapterIds(prev =>
+                              prev.includes(ch.id)
+                                ? prev.filter(id => id !== ch.id)
+                                : [...prev, ch.id]
+                            );
+                          }}
+                          className="rounded text-secondary-600 focus:ring-secondary/20 border-surface-300 w-3.5 h-3.5 cursor-pointer"
+                        />
+                        <span className="truncate">{ch.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Button
-            variant="primary"
-            icon={<Plus size={18} />}
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-          >
-            Share Resource
-          </Button>
-        </div>
-      </div>
+      </Card>
 
       {/* Tabs */}
       <div className="flex border-b border-surface-200 mb-6 gap-6">
@@ -324,7 +522,12 @@ export default function TeacherClassActivitiesPage() {
           }`}
         >
           <Layers size={16} />
-          Shared Materials ({shares.length})
+          Shared Materials ({shares.filter((s) => {
+            if (filterClass && s.class_id !== filterClass) return false;
+            if (filterSubject && s.subject_id !== filterSubject) return false;
+            if (filterChapterIds.length > 0 && (!s.chapter_id || !filterChapterIds.includes(s.chapter_id))) return false;
+            return true;
+          }).length})
         </button>
         <button
           onClick={() => setViewMode('submissions')}
@@ -341,7 +544,12 @@ export default function TeacherClassActivitiesPage() {
 
       {/* View Mode Content */}
       {viewMode === 'shares' ? (
-        shares.length === 0 ? (
+        shares.filter((s) => {
+          if (filterClass && s.class_id !== filterClass) return false;
+          if (filterSubject && s.subject_id !== filterSubject) return false;
+          if (filterChapterIds.length > 0 && (!s.chapter_id || !filterChapterIds.includes(s.chapter_id))) return false;
+          return true;
+        }).length === 0 ? (
           <Card className="text-center py-16">
             <div className="text-5xl mb-4">📤</div>
             <h3 className="text-lg font-bold text-surface-800">No resources shared yet</h3>
@@ -362,7 +570,12 @@ export default function TeacherClassActivitiesPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {shares.map((share) => {
+            {shares.filter((s) => {
+              if (filterClass && s.class_id !== filterClass) return false;
+              if (filterSubject && s.subject_id !== filterSubject) return false;
+              if (filterChapterIds.length > 0 && (!s.chapter_id || !filterChapterIds.includes(s.chapter_id))) return false;
+              return true;
+            }).map((share) => {
               const Icon = {
                 activity: BookOpen,
                 document: FileText,
@@ -400,15 +613,17 @@ export default function TeacherClassActivitiesPage() {
                     )}
 
                     {/* Meta specifics */}
-                    {share.type === 'activity' ? (
+                    {(share.class?.name || share.subject?.name || share.chapter?.name) && (
                       <div className="mt-auto bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs text-surface-600 mb-4 space-y-1">
                         <p className="font-extrabold text-surface-800">
-                          {share.class?.name} &bull; {share.subject?.name}
+                          {share.class?.name || 'Class'} {share.subject?.name ? `• ${share.subject.name}` : ''}
                         </p>
-                        <p className="truncate">📁 Chapter: {share.chapter?.name}</p>
-                        <p className="capitalize">🎮 Mode: Practice ({share.activity_type})</p>
+                        {share.chapter?.name && <p className="truncate">📁 Chapter: {share.chapter.name}</p>}
+                        {share.type === 'activity' && <p className="capitalize">🎮 Mode: Practice ({share.activity_type})</p>}
                       </div>
-                    ) : (
+                    )}
+
+                    {share.type !== 'activity' && share.url && (
                       <div className="mt-auto border border-dashed border-surface-100 rounded-xl p-3 text-xs mb-4 flex items-center justify-between gap-4">
                         <span className="truncate text-surface-400 font-medium">Link: {share.url}</span>
                         <a
@@ -566,64 +781,21 @@ export default function TeacherClassActivitiesPage() {
               />
             </div>
 
+
+
             {/* Type Specific Fields */}
             {shareType === 'activity' ? (
-              <div className="space-y-4">
-                {/* Select Class */}
-                <Select
-                  label="Select Class"
-                  value={selectedClass}
-                  onChange={(e) => {
-                    setSelectedClass(e.target.value);
-                    setSelectedSubject('');
-                    setSelectedChapter('');
-                  }}
-                  options={[
-                    { value: '', label: 'Select Class' },
-                    ...classes.map((c) => ({ value: c.id, label: c.name })),
-                  ]}
-                />
-
-                {/* Select Subject */}
-                <Select
-                  label="Select Subject"
-                  value={selectedSubject}
-                  onChange={(e) => {
-                    setSelectedSubject(e.target.value);
-                    setSelectedChapter('');
-                  }}
-                  disabled={!selectedClass}
-                  options={[
-                    { value: '', label: 'Select Subject' },
-                    ...subjects.map((s) => ({ value: s.id, label: s.name })),
-                  ]}
-                />
-
-                {/* Select Chapter */}
-                <Select
-                  label="Select Chapter"
-                  value={selectedChapter}
-                  onChange={(e) => setSelectedChapter(e.target.value)}
-                  disabled={!selectedSubject}
-                  options={[
-                    { value: '', label: 'Select Chapter' },
-                    ...chapters.map((ch) => ({ value: ch.id, label: ch.name })),
-                  ]}
-                />
-
-                {/* Activity Game Type */}
-                <Select
-                  label="Select Game Type"
-                  value={activityType}
-                  onChange={(e) => setActivityType(e.target.value)}
-                  options={[
-                    { value: 'quiz', label: 'Quiz' },
-                    { value: 'flashcard', label: 'Flashcards' },
-                    { value: 'matching', label: 'Matching Game' },
-                    { value: 'picture', label: 'Picture Game' },
-                  ]}
-                />
-              </div>
+              <Select
+                label="Select Game Type"
+                value={activityType}
+                onChange={(e) => setActivityType(e.target.value)}
+                options={[
+                  { value: 'quiz', label: 'Quiz' },
+                  { value: 'flashcard', label: 'Flashcards' },
+                  { value: 'matching', label: 'Matching Game' },
+                  { value: 'picture', label: 'Picture Game' },
+                ]}
+              />
             ) : (
               <div>
                 <label className="block text-xs font-bold text-surface-500 uppercase tracking-wide mb-1.5">

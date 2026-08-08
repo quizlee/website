@@ -10,6 +10,11 @@ import { PictureGameActivity } from '../../components/activities/PictureGameActi
 import { DragDropActivity } from '../../components/activities/DragDropActivity';
 import type { Content, ActivityType, PlayMode } from '../../lib/types';
 import { toast } from '../../components/ui/Toast';
+import {
+  getActivePlaySession,
+  saveActivePlaySession,
+  clearActivePlaySession,
+} from '../../lib/playSession';
 
 export default function PlayPage() {
   const [searchParams] = useSearchParams();
@@ -22,12 +27,26 @@ export default function PlayPage() {
   const questionCount = parseInt(searchParams.get('count') || '10');
   const shareId = searchParams.get('share_id');
 
+  const sessionKey = `${activityType}_${[...chapterIds].sort().join('_')}_${mode}_${questionCount}_${shareId || ''}`;
+
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState<number>(Date.now());
 
   useEffect(() => {
     async function fetchContent() {
+      // 1. Check if an active play session already exists in sessionStorage for this session key
+      const existingSession = getActivePlaySession(sessionKey);
+      if (existingSession && existingSession.content && existingSession.content.length > 0) {
+        setContent(existingSession.content);
+        if (existingSession.startTime) {
+          setStartTime(existingSession.startTime);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch fresh content if no active session
       const { data, error } = await supabase
         .from('content')
         .select('*')
@@ -86,7 +105,19 @@ export default function PlayPage() {
       let items = filteredQuestions.sort(() => Math.random() - 0.5);
       items = items.slice(0, limit);
 
+      const now = Date.now();
+      saveActivePlaySession({
+        sessionKey,
+        content: items,
+        startTime: now,
+        currentIndex: 0,
+        answers: Array(items.length).fill(null),
+        hintsShown: Array(items.length).fill(false),
+        optionOrders: {},
+      });
+
       setContent(items);
+      setStartTime(now);
       setLoading(false);
     }
 
@@ -96,6 +127,7 @@ export default function PlayPage() {
   }, [profile]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleComplete = useCallback(async (score: number, total: number, correctQuestionIds: string[] = []) => {
+    clearActivePlaySession();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     const pointsEarnedRaw = mode === 'competitive' ? Math.round(score * 10) : Math.round(score * 5);
     let pointsEarnedCapped = pointsEarnedRaw;
@@ -169,9 +201,13 @@ export default function PlayPage() {
     if (shareId) {
       params.set('share_id', shareId);
     }
+    const fromUrl = searchParams.get('from');
+    if (fromUrl) {
+      params.set('from', fromUrl);
+    }
 
     navigate(`/student/result?${params.toString()}`, { replace: true });
-  }, [startTime, mode, profile, chapterIds, activityType, questionCount, navigate, shareId]);
+  }, [startTime, mode, profile, chapterIds, activityType, questionCount, navigate, shareId, searchParams]);
 
   if (loading) {
     return (
@@ -185,6 +221,7 @@ export default function PlayPage() {
   }
 
   if (content.length === 0) {
+    const fromUrl = searchParams.get('from');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -192,10 +229,10 @@ export default function PlayPage() {
           <h2 className="text-xl font-bold text-surface-900 mb-2">No Content Found</h2>
           <p className="text-surface-500 mb-6">There are no {activityType} questions for these chapters yet.</p>
           <button
-            onClick={() => navigate('/student')}
+            onClick={() => navigate(fromUrl || '/student')}
             className="text-primary-600 font-semibold hover:text-primary-700 cursor-pointer"
           >
-            ← Go back to Home
+            ← Go back
           </button>
         </div>
       </div>

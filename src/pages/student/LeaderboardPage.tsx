@@ -28,10 +28,10 @@ export default function LeaderboardPage() {
         </div>
 
         <button
-          onClick={() => navigate('/student/compete')}
+          onClick={() => navigate('/student/competitive')}
           className="mt-2 inline-flex items-center gap-2 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-600 hover:to-indigo-700 text-white font-extrabold px-6 py-3 rounded-2xl shadow-md shadow-primary/20 hover:shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer text-sm"
         >
-          Go to Compete
+          Go to Competitive
           <ArrowRight size={16} />
         </button>
       </Card>

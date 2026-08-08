@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { avatarPresets, parseAvatar } from '../../lib/avatar';
 
 interface AvatarProps {
@@ -7,6 +8,12 @@ interface AvatarProps {
 }
 
 export function Avatar({ avatarUrl, initials, className = 'w-10 h-10 text-sm font-bold' }: AvatarProps) {
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [avatarUrl]);
+
   const parsed = parseAvatar(avatarUrl);
 
   if (parsed.type === 'preset' && parsed.presetKey) {
@@ -21,10 +28,16 @@ export function Avatar({ avatarUrl, initials, className = 'w-10 h-10 text-sm fon
     );
   }
 
-  if (avatarUrl) {
+  if (avatarUrl && !imageError) {
     return (
       <div className={`rounded-full overflow-hidden shrink-0 ${className}`}>
-        <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+        <img
+          src={avatarUrl}
+          alt={initials || ''}
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={() => setImageError(true)}
+        />
       </div>
     );
   }

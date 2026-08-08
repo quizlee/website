@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
-import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown, Plus, UserPlus, Clock, Target } from 'lucide-react';
+import { Save, Shield, User, Palette, Check, Trash2, RefreshCw, Edit, Lock, Smile, Loader2, CheckCircle2, XCircle, Trophy, Award, Star, Compass, Zap, Rocket, Crown, Plus, UserPlus } from 'lucide-react';
 import { themes, getSavedTheme, saveTheme } from '../../lib/theme';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../../components/ui/Avatar';
@@ -72,14 +72,14 @@ const titles = [
 ];
 
 interface SettingsPageProps {
-  defaultTab?: 'account' | 'recent' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version';
+  defaultTab?: 'account' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version';
 }
 
 export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPageProps) {
   const { profile, user, setProfile } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'account' | 'recent' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version'>(() => {
+  const [activeTab, setActiveTab] = useState<'account' | 'avatar' | 'profile_view' | 'level' | 'points' | 'theme' | 'privacy' | 'version'>(() => {
     if (location.state?.tab) {
       return location.state.tab;
     }
@@ -97,7 +97,7 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
   const [isEditing, setIsEditing] = useState(false);
 
   // Avatar Tab state
-  const googleAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
+  const googleAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || localStorage.getItem('quizlee_last_google_avatar') || null;
   const [avatarType, setAvatarType] = useState<'preset' | 'google' | 'initials'>(() => {
     if (profile?.avatar_url) {
       const parsed = parseAvatar(profile.avatar_url);
@@ -216,10 +216,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
       toast('Failed to update equipped badges', 'error');
     }
   };
-
-  // Recent Activities state
-  const [attempts, setAttempts] = useState<any[]>([]);
-  const [loadingAttempts, setLoadingAttempts] = useState(true);
 
   // Student-Teacher Connection state
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -353,53 +349,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
   useEffect(() => {
     if (activeTab === 'account') {
       fetchStudentTeachers();
-    }
-  }, [activeTab, profile]);
-
-  const fetchHistory = async () => {
-    if (!profile?.id) return;
-    setLoadingAttempts(true);
-    try {
-      const { data, error } = await supabase
-        .from('activity_attempts')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching history:', error);
-        return;
-      }
-
-      if (data && data.length > 20) {
-        const keepList = data.slice(0, 20);
-        const deleteIds = data.slice(20).map(item => item.id);
-
-        // Delete older activities in background
-        supabase
-          .from('activity_attempts')
-          .delete()
-          .in('id', deleteIds)
-          .then(({ error: deleteError }) => {
-            if (deleteError) {
-              console.error('Error deleting old activities:', deleteError);
-            }
-          });
-
-        setAttempts(keepList);
-      } else {
-        setAttempts(data || []);
-      }
-    } catch (err) {
-      console.error('Error in fetchHistory:', err);
-    } finally {
-      setLoadingAttempts(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'recent') {
-      fetchHistory();
     }
   }, [activeTab, profile]);
 
@@ -613,7 +562,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
   // Navigation Items
   const tabs = [
     { key: 'account', label: 'Account', icon: User },
-    { key: 'recent', label: 'Recent', icon: Clock },
     { key: 'profile_view', label: 'User Profile', icon: User },
     { key: 'points', label: 'Points & Titles', icon: Award },
     { key: 'level', label: 'Levels and Badges', icon: Trophy },
@@ -1854,115 +1802,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
     }, 1500);
   };
 
-  const renderRecentSettings = () => {
-    const formatDate = (date: string) => {
-      return new Date(date).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    };
-
-    const activityEmoji: Record<string, string> = {
-      quiz: '🧠',
-      flashcard: '📄',
-      matching: '🔗',
-      picture: '🖼️',
-    };
-
-    if (loadingAttempts) {
-      return (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
-      );
-    }
-
-    return (
-      <div className="animate-fade-in flex flex-col gap-6">
-        <Card>
-          <div className="flex items-center gap-3 mb-6 border-b border-surface-100 pb-4">
-            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center">
-              <Clock size={22} className="stroke-[2.5]" />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-surface-900 font-headline-sm">Recent Activities</h3>
-              <p className="text-sm text-surface-500 font-body-md">View your history of played activities</p>
-            </div>
-          </div>
-
-          {attempts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-5xl mb-4">📭</div>
-              <h4 className="text-base font-bold text-surface-900 mb-2">No Activities Yet</h4>
-              <p className="text-sm text-surface-500">Start playing to see your history here!</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {attempts.map((attempt) => {
-                const percentage = attempt.total_questions > 0
-                  ? Math.round((attempt.score / attempt.total_questions) * 100)
-                  : 0;
-
-                return (
-                  <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-surface-50 border border-surface-200 rounded-2xl">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white border border-surface-200 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 shadow-3xs">
-                        {activityEmoji[attempt.activity_type] || '❓'}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-bold text-surface-900 capitalize text-sm">
-                            {attempt.activity_type}
-                          </p>
-                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
-                            attempt.mode === 'competitive' 
-                              ? 'bg-danger-50 text-danger-700 border-danger-200' 
-                              : 'bg-primary-50 text-primary-700 border-primary-200'
-                          }`}>
-                            {attempt.mode}
-                          </span>
-                        </div>
-                        <p className="text-xs text-surface-450 font-bold">{formatDate(attempt.created_at)}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 border-surface-150 pt-3 sm:pt-0">
-                      <div className="text-center min-w-[50px]">
-                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">Score</span>
-                        <div className="flex items-center justify-center gap-1 text-sm font-black text-surface-850 mt-1">
-                          <Target size={13} className="text-primary" />
-                          <span>{percentage}%</span>
-                        </div>
-                      </div>
-                      <div className="text-center min-w-[50px]">
-                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">Time</span>
-                        <div className="flex items-center justify-center gap-1 text-sm font-black text-surface-850 mt-1">
-                          <Clock size={13} className="text-indigo-500" />
-                          <span>{attempt.time_taken_seconds}s</span>
-                        </div>
-                      </div>
-                      <div className="text-center min-w-[50px]">
-                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-surface-400">XP</span>
-                        <div className="flex items-center justify-center gap-1 text-sm font-black text-warning-700 mt-1">
-                          <Star size={13} className="text-warning-500 fill-warning-500/20" />
-                          <span>+{attempt.points_earned}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-      </div>
-    );
-  };
-
   const renderVersionSettings = () => {
     return (
       <div className="flex flex-col gap-6">
@@ -2052,7 +1891,6 @@ export default function SettingsPage({ defaultTab = 'profile_view' }: SettingsPa
         {/* Right Content Panel */}
         <div className="flex-grow">
           {activeTab === 'account' && renderAccountSettings()}
-          {activeTab === 'recent' && renderRecentSettings()}
           {activeTab === 'avatar' && renderAvatarSettings()}
           {activeTab === 'profile_view' && renderUserProfileSettings()}
           {activeTab === 'level' && renderLevelSettings()}

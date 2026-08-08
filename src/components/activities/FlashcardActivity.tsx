@@ -3,6 +3,11 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import type { Content, FlashcardPayload, PlayMode } from '../../lib/types';
 import { RotateCcw, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import {
+  getActivePlaySession,
+  updateActivePlaySession,
+  clearActivePlaySession,
+} from '../../lib/playSession';
 
 interface FlashcardActivityProps {
   content: Content[];
@@ -16,9 +21,10 @@ export function FlashcardActivity({
   content,
   onComplete,
 }: FlashcardActivityProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const savedSession = getActivePlaySession();
+  const [currentIndex, setCurrentIndex] = useState<number>(() => savedSession?.currentIndex ?? 0);
   const [flipped, setFlipped] = useState(false);
-  const [known, setKnown] = useState(0);
+  const [known, setKnown] = useState<number>(() => savedSession?.known ?? 0);
 
   const total = content.length;
   const currentCard = content[currentIndex];
@@ -26,23 +32,30 @@ export function FlashcardActivity({
   const progress = ((currentIndex + 1) / total) * 100;
 
   function handleKnow() {
-    setKnown((prev) => prev + 1);
+    const nextKnown = known + 1;
+    setKnown(nextKnown);
+    updateActivePlaySession({ known: nextKnown });
     handleNext();
   }
 
   function handleNext() {
     if (currentIndex + 1 >= total) {
+      clearActivePlaySession();
       onComplete(known + (flipped ? 1 : 0), total, []);
     } else {
-      setCurrentIndex((prev) => prev + 1);
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
       setFlipped(false);
+      updateActivePlaySession({ currentIndex: nextIdx });
     }
   }
 
   function handlePrevious() {
     if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
+      const prevIdx = currentIndex - 1;
+      setCurrentIndex(prevIdx);
       setFlipped(false);
+      updateActivePlaySession({ currentIndex: prevIdx });
     }
   }
 

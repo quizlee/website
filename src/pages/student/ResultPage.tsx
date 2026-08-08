@@ -24,9 +24,11 @@ export default function ResultPage() {
 
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
 
+  const fromUrl = searchParams.get('from');
+
   const handlePlayAgain = () => {
     if (chapterIds.length === 0 || !activityType) {
-      navigate('/student');
+      navigate(fromUrl || '/student');
       return;
     }
 
@@ -36,8 +38,17 @@ export default function ResultPage() {
     if (mode) playParams.set('mode', mode);
     playParams.set('count', count);
     if (shareId) playParams.set('share_id', shareId);
+    if (fromUrl) playParams.set('from', fromUrl);
     
     navigate(`/student/play?${playParams.toString()}`, { replace: true });
+  };
+
+  const handleReturn = () => {
+    if (fromUrl) {
+      navigate(fromUrl);
+    } else {
+      navigate('/student');
+    }
   };
 
   // Sync points with store and database on mount
@@ -219,7 +230,7 @@ export default function ResultPage() {
             </button>
           ) : (
             <button
-              onClick={() => navigate('/student/practice')}
+              onClick={handleReturn}
               className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer"
             >
               <Home size={18} />

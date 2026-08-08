@@ -384,6 +384,7 @@ export default function PracticePage() {
     params.set('type', activeActivityType || 'quiz');
     params.set('mode', selectedPlayMode);
     if (selectedPlayMode === 'practice') params.set('count', selectedQuestionCount);
+    params.set('from', '/student/practice');
     setIsConfigModalOpen(false);
     navigate(`/student/play?${params.toString()}`);
   };

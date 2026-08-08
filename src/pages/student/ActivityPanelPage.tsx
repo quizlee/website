@@ -75,6 +75,9 @@ export default function ActivityPanelPage() {
     if (selectedMode === 'practice') {
       params.set('count', questionCount);
     }
+    if (searchParams.get('from')) {
+      params.set('from', searchParams.get('from')!);
+    }
 
     navigate(`/student/play?${params.toString()}`);
   }

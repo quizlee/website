@@ -15,6 +15,7 @@ import {
   Users,
   Medal,
   GraduationCap,
+  Clock,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 
@@ -48,9 +49,9 @@ export default function StudentLayout() {
   const dynamicNavItems = [
     { to: '/student', icon: Home, label: 'Home', end: true },
     { to: '/student/practice', icon: BookOpen, label: 'Practice', end: false },
-    { to: '/student/compete', icon: Trophy, label: 'Compete', end: false },
-    ...(hasConnectedTeacher ? [{ to: '/student/class-activities', icon: GraduationCap, label: 'Classroom', end: false }] : []),
+    { to: '/student/competitive', icon: Trophy, label: 'Competitive', end: false },
     { to: '/student/leaderboard', icon: Medal, label: 'Leaderboard', end: false },
+    { to: '/student/recent', icon: Clock, label: 'Recent', end: false },
   ];
 
   const isPlayPage = location.pathname === '/student/play';
@@ -160,14 +161,16 @@ export default function StudentLayout() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4">
-              {/* Friends icon */}
-              <button 
-                onClick={() => navigate('/student/friends')}
-                className="p-1.5 sm:p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
-                title="Friends & Classmates"
-              >
-                <Users size={18} className="sm:w-5 sm:h-5" />
-              </button>
+              {/* Classroom icon */}
+              {hasConnectedTeacher && (
+                <button 
+                  onClick={() => navigate('/student/class-activities')}
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
+                  title="Classroom Activities"
+                >
+                  <GraduationCap size={18} className="sm:w-5 sm:h-5" />
+                </button>
+              )}
 
               {/* XP Count with Star Icon */}
               <div 
@@ -235,6 +238,14 @@ export default function StudentLayout() {
                       >
                         <User size={16} />
                         Profile
+                      </button>
+
+                      <button
+                        onClick={() => { setDropdownOpen(false); navigate('/student/friends'); }}
+                        className="w-full px-4 py-2 text-left text-sm text-on-surface-variant hover:bg-primary-50/50 hover:text-primary transition-colors font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Users size={16} />
+                        Friends
                       </button>
 
                       <button

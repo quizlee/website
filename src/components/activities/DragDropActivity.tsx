@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import type { Content, DragndropPayload, PlayMode } from '../../lib/types';
 import { Check, X, RefreshCw, Trophy, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface Chip {
   id: string;
@@ -24,6 +24,16 @@ export function DragDropActivity({
   onComplete,
 }: DragDropActivityProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromUrl = searchParams.get('from');
+
+  const handleQuit = () => {
+    if (fromUrl) {
+      navigate(fromUrl);
+    } else {
+      navigate('/student');
+    }
+  };
   // Selections state: { [questionIndex]: { [blankIndex]: Chip } }
   const [selections, setSelections] = useState<Record<number, Record<number, Chip>>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -388,7 +398,7 @@ export function DragDropActivity({
         <Button
           variant="outline"
           size="lg"
-          onClick={() => navigate('/student/practice')}
+          onClick={handleQuit}
           className="flex items-center gap-1.5 px-4 sm:px-8 py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-xl sm:rounded-2xl font-bold border-2 border-slate-200 text-slate-500 hover:bg-slate-50"
         >
           <LogOut size={16} />
