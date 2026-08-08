@@ -4,13 +4,11 @@ import {
   LayoutDashboard,
   Users,
   UserCheck,
-  BookOpen,
   FileText,
   Trophy,
   ClipboardList,
   Settings,
   LogOut,
-  Upload,
   Gamepad2,
 } from 'lucide-react';
 

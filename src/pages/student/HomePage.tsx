@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { toast } from '../../components/ui/Toast';
 import type { Activity } from '../../lib/types';
 import { Target, Zap, Flame } from 'lucide-react';
 
@@ -95,18 +94,6 @@ export default function StudentHomePage() {
   const handleActivityClick = () => {
     navigate('/student/practice');
   };
-
-  const handlePlayHero = () => {
-    toast('Daily Activity is coming soon! 🚀', 'info');
-  };
-
-  // Weekly Goal helpers
-  // const weeklyTarget = 5;
-  // const progressPercent = Math.min(Math.round((weeklyCount / weeklyTarget) * 100), 100);
-  // const xpEarnedThisWeek = weeklyCount * 50;
-  // const today = new Date();
-  // const dayOfWeek = today.getDay();
-  // const daysLeft = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
 
   if (!profile?.class_id) {
     return (

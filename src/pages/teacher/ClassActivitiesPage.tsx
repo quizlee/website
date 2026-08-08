@@ -102,8 +102,6 @@ export default function TeacherClassActivitiesPage() {
   const [filterChapters, setFilterChapters] = useState<ChapterItem[]>([]);
 
   const [filterChapterDropdownOpen, setFilterChapterDropdownOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const filterChapterRef = useRef<HTMLDivElement>(null);
 
   // Persist curriculum filters to localStorage
@@ -301,8 +299,8 @@ export default function TeacherClassActivitiesPage() {
       toast('URL is required for documents and links', 'error');
       return;
     }
-    if (shareType === 'activity' && (!selectedClass || !selectedSubject || selectedChapterIds.length === 0)) {
-      toast('Please select a Class, Subject, and at least one Chapter for the Activity', 'error');
+    if (shareType === 'activity' && (!filterClass || !filterSubject || filterChapterIds.length === 0)) {
+      toast('Please select a Class, Subject, and at least one Chapter in the filter bar first', 'error');
       return;
     }
     if (selectedStudentIds.length === 0) {
@@ -312,16 +310,16 @@ export default function TeacherClassActivitiesPage() {
 
     setSaving(true);
     try {
-      if (selectedChapterIds.length > 0) {
-        const promises = selectedChapterIds.map(async (chId) => {
+      if (filterChapterIds.length > 0) {
+        const promises = filterChapterIds.map(async (chId: string) => {
           const shareData = {
             teacher_id: profile!.id,
             title: title.trim(),
             description: description.trim() || null,
             type: shareType,
             url: shareType !== 'activity' ? url.trim() : null,
-            class_id: selectedClass || null,
-            subject_id: selectedSubject || null,
+            class_id: filterClass || null,
+            subject_id: filterSubject || null,
             chapter_id: chId,
             activity_type: shareType === 'activity' ? activityType : null,
             student_ids: selectedStudentIds,
@@ -337,8 +335,8 @@ export default function TeacherClassActivitiesPage() {
           description: description.trim() || null,
           type: shareType,
           url: shareType !== 'activity' ? url.trim() : null,
-          class_id: selectedClass || null,
-          subject_id: selectedSubject || null,
+          class_id: filterClass || null,
+          subject_id: filterSubject || null,
           chapter_id: null,
           activity_type: shareType === 'activity' ? activityType : null,
           student_ids: selectedStudentIds,
