@@ -568,9 +568,34 @@ export default function TeacherClassActivitiesPage() {
         activity_type: shareType === 'activity' ? activityType : null,
         student_ids: selectedStudentIds,
       };
-      const { error } = await supabase.from('teacher_shares').insert(shareData);
+      const { data: insertedShares, error } = await supabase.from('teacher_shares').insert(shareData).select();
       if (error) throw error;
       window.dispatchEvent(new Event('classroom_activity_updated'));
+
+      // Send instant real-time broadcast notification to all connected student devices
+      try {
+        const teacherName = profile?.full_name || profile?.username || 'Your Teacher';
+        const realtimeChannel = supabase.channel('quizlee-realtime-classroom-broadcast');
+        await realtimeChannel.subscribe();
+        await realtimeChannel.send({
+          type: 'broadcast',
+          event: 'material_shared',
+          payload: {
+            share_id: insertedShares?.[0]?.id || Date.now().toString(),
+            teacher_id: profile?.id,
+            teacher_name: teacherName,
+            title: title.trim(),
+            type: shareType,
+            class_id: filterClass || null,
+            subject_id: filterSubject || null,
+            student_ids: selectedStudentIds || [],
+            created_at: new Date().toISOString(),
+          },
+        });
+      } catch (bcErr) {
+        console.warn('Realtime broadcast warning:', bcErr);
+      }
+
       try {
         const bc = new BroadcastChannel('quizlee_classroom_updates');
         bc.postMessage({ type: 'MATERIAL_SHARED', timestamp: Date.now() });

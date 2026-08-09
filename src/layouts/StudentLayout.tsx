@@ -187,6 +187,45 @@ export default function StudentLayout() {
       fetchPendingCount();
     }, 5000);
 
+    // Subscribe to instant Supabase Realtime Broadcast notifications
+    const realtimeBroadcastChannel = supabase
+      .channel('quizlee-realtime-classroom-broadcast')
+      .on(
+        'broadcast',
+        { event: 'material_shared' },
+        (payload) => {
+          const data = payload.payload;
+          if (!data) return;
+
+          // Target check: filter by student_ids or class_id if specified
+          if (data.student_ids && Array.isArray(data.student_ids) && data.student_ids.length > 0) {
+            if (!data.student_ids.includes(profile.id)) return;
+          }
+          if (data.class_id && profile?.class_id && data.class_id !== profile.class_id) {
+            return;
+          }
+
+          fetchPendingCount();
+
+          const teacherName = data.teacher_name || 'Your teacher';
+          const shareTitle = data.title || 'New Material';
+
+          // Pop up native device/browser push notification
+          sendDeviceNotification(
+            '📚 New Classroom Material!',
+            `${teacherName} shared: ${shareTitle}`,
+            () => navigate('/student/class-activities')
+          );
+
+          // Pop up in-app toast notification
+          toast(`📚 New material shared by ${teacherName}: ${shareTitle}`, 'info');
+
+          // Play sound chime
+          playNotificationChime();
+        }
+      )
+      .subscribe();
+
     // Subscribe to teacher_shares INSERT and DELETE
     const sharesChannel = supabase
       .channel('student-layout-shares-v2')
@@ -257,6 +296,7 @@ export default function StudentLayout() {
         } catch {}
       }
       clearInterval(intervalId);
+      supabase.removeChannel(realtimeBroadcastChannel);
       supabase.removeChannel(sharesChannel);
       supabase.removeChannel(subsChannel);
     };
