@@ -46,7 +46,57 @@ export default function PlayPage() {
         return;
       }
 
-      // 2. Fetch fresh content if no active session
+      // 2. Check for custom content IDs (bulk imported activity shared by teacher)
+      let targetContentIds: string[] = [];
+      const queryContentIds = searchParams.get('content_ids');
+
+      if (queryContentIds) {
+        targetContentIds = queryContentIds.split(',').map((s) => s.trim()).filter(Boolean);
+      } else if (shareId) {
+        const { data: shareData } = await supabase
+          .from('teacher_shares')
+          .select('url')
+          .eq('id', shareId)
+          .maybeSingle();
+
+        if (shareData?.url && shareData.url.startsWith('content_ids:')) {
+          targetContentIds = shareData.url.replace('content_ids:', '').split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+
+      if (targetContentIds.length > 0) {
+        const { data: customData, error: customErr } = await supabase
+          .from('content')
+          .select('*')
+          .in('id', targetContentIds);
+
+        if (customErr) {
+          console.error('Error fetching custom activity content:', customErr);
+          setLoading(false);
+          return;
+        }
+
+        const items = customData || [];
+        if (items.length > 0) {
+          const now = Date.now();
+          saveActivePlaySession({
+            sessionKey,
+            content: items,
+            startTime: now,
+            currentIndex: 0,
+            answers: Array(items.length).fill(null),
+            hintsShown: Array(items.length).fill(false),
+            optionOrders: {},
+          });
+
+          setContent(items);
+          setStartTime(now);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fallback: Fetch standard chapter content if no custom content IDs
       const { data, error } = await supabase
         .from('content')
         .select('*')
@@ -121,7 +171,7 @@ export default function PlayPage() {
       setLoading(false);
     }
 
-    if (chapterIds.length > 0 && activityType) {
+    if ((chapterIds.length > 0 || searchParams.has('content_ids') || shareId) && activityType) {
       fetchContent();
     }
   }, [profile]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,10 +179,37 @@ export default function PlayPage() {
   const handleComplete = useCallback(async (score: number, total: number, correctQuestionIds: string[] = []) => {
     clearActivePlaySession();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    const pointsEarnedRaw = mode === 'competitive' ? Math.round(score * 10) : Math.round(score * 5);
+    
+    let pointsEarnedRaw = mode === 'competitive' ? Math.round(score * 10) : Math.round(score * 5);
+
+    // If this is a classroom activity share, calculate actual activity XP based on xp_per_item
+    if (shareId) {
+      let xpPerItemVal = 10;
+      try {
+        const { data: shareData } = await supabase
+          .from('teacher_shares')
+          .select('description')
+          .eq('id', shareId)
+          .maybeSingle();
+
+        if (shareData?.description) {
+          const parsed = JSON.parse(shareData.description);
+          if (parsed.xp_per_item !== undefined) {
+            xpPerItemVal = Number(parsed.xp_per_item) || 10;
+          }
+        }
+      } catch {
+        // fallback
+      }
+
+      const totalActivityXp = (total > 0 ? total : content.length) * xpPerItemVal;
+      const scoreRatio = total > 0 ? (score / total) : 1;
+      pointsEarnedRaw = Math.round(totalActivityXp * scoreRatio);
+    }
+
     let pointsEarnedCapped = pointsEarnedRaw;
 
-    // Save attempt
+    // Save attempt & award points to database
     if (profile?.id) {
       const todayStr = new Date().toLocaleDateString('en-CA');
       const lastDate = profile.last_xp_earned_date;
@@ -152,8 +229,10 @@ export default function PlayPage() {
         points_earned: pointsEarnedCapped,
       });
 
-      // Update daily quota values on profiles table
+      // Update total points & daily quota values on profiles table in database
+      const newTotalPoints = (profile.points || 0) + pointsEarnedCapped;
       await supabase.from('profiles').update({
+        points: newTotalPoints,
         daily_xp_earned: currentDailyXPEarned + pointsEarnedCapped,
         last_xp_earned_date: todayStr
       }).eq('id', profile.id);
@@ -175,6 +254,7 @@ export default function PlayPage() {
       }
 
       if (shareId) {
+        const scorePercentage = total > 0 ? Math.round((score / total) * 100) : 100;
         await supabase.from('student_share_submissions').upsert({
           share_id: shareId,
           student_id: profile.id,
@@ -182,6 +262,7 @@ export default function PlayPage() {
           score: score,
           completed_at: new Date().toISOString()
         }, { onConflict: 'share_id,student_id' });
+        window.dispatchEvent(new Event('classroom_activity_updated'));
       }
     }
 

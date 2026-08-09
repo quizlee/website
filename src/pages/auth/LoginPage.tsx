@@ -137,9 +137,38 @@ toast(error.message, 'error');
             <h1 className="text-3xl font-extrabold text-gray-800 mb-2">Welcome to <span className="bg-gradient-to-r from-[#1d6ee6] to-[#38bdf8] bg-clip-text text-transparent">Quizlee</span></h1>
             <p className="text-sm text-gray-600">Learn, Play, and Grow! 🚀</p>
           </div>
-          <Button variant="outline" size="lg" className="w-full whitespace-nowrap" onClick={handleGoogleLogin} loading={googleLoading} icon={googleIcon}>
+          <Button variant="outline" size="lg" className="w-full whitespace-nowrap mb-3" onClick={handleGoogleLogin} loading={googleLoading} icon={googleIcon}>
             Continue with Google
           </Button>
+
+          {window.location.hostname === 'localhost' && (
+            <button
+              onClick={() => {
+                sessionStorage.setItem('dev_admin_bypass', 'true');
+                const mockUser = {
+                  id: '182b749a-ceef-45f0-a3e1-989b431e8d7c',
+                  email: 'ghoruiparthapratim@gmail.com',
+                  user_metadata: { full_name: 'Partha Ghorui' },
+                  app_metadata: { provider: 'google' }
+                };
+                const mockProfile = {
+                  id: '182b749a-ceef-45f0-a3e1-989b431e8d7c',
+                  role: 'admin',
+                  username: 'partha',
+                  full_name: 'Partha Ghorui',
+                  points: 1000
+                };
+                useAuthStore.getState().setSession({ user: mockUser } as any);
+                useAuthStore.getState().setProfile(mockProfile as any);
+                useAuthStore.getState().setInitialized(true);
+                useAuthStore.getState().setLoading(false);
+                navigate('/1234/admin', { replace: true });
+              }}
+              className="w-full text-xs bg-slate-800 text-white hover:bg-slate-700 font-bold py-2 px-4 rounded-xl cursor-pointer"
+            >
+              🛠️ Local Dev Admin Bypass
+            </button>
+          )}
         </div>
       </div>
     </div>

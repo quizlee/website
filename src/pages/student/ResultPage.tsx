@@ -190,7 +190,7 @@ export default function ResultPage() {
               </div>
               <div className="text-left min-w-0">
                 <p className="text-xs text-surface-500 font-semibold truncate">Points</p>
-                <p className="text-base font-extrabold text-surface-900">+{points}</p>
+                <p className="text-base font-extrabold text-surface-900">+{actualPoints}</p>
                 {actualPoints < points && (
                   <p className="text-[9px] text-red-650 font-black leading-none mt-1 animate-pulse uppercase tracking-wider shrink-0 select-none whitespace-nowrap">
                     Daily Limit Reached!
@@ -213,20 +213,22 @@ export default function ResultPage() {
 
         {/* Actions */}
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={handlePlayAgain}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer"
-          >
-            <RotateCcw size={18} />
-            Play Again
-          </button>
-          {shareId ? (
+          {!(shareId || fromUrl === '/student/class-activities') && (
+            <button
+              onClick={handlePlayAgain}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-primary text-white bouncy shadow-lg hover:shadow-primary/20 cursor-pointer"
+            >
+              <RotateCcw size={18} />
+              Play Again
+            </button>
+          )}
+          {shareId || fromUrl === '/student/class-activities' ? (
             <button
               onClick={() => navigate('/student/class-activities')}
               className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-bold select-none transition-all text-sm bg-indigo-600 hover:bg-indigo-700 text-white bouncy shadow-lg hover:shadow-indigo-500/20 cursor-pointer"
             >
               <GraduationCap size={18} />
-              Classroom
+              Back to Classroom
             </button>
           ) : (
             <button

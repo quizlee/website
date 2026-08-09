@@ -15,7 +15,6 @@ const navItems = [
   { to: '/teacher', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/teacher/content', icon: FileText, label: 'Content Manager', end: false },
   { to: '/teacher/import', icon: Upload, label: 'Bulk Import', end: false },
-  { to: '/teacher/class-activities', icon: BookOpen, label: 'Class Activities', end: false },
   { to: '/teacher/account', icon: User, label: 'Account', end: false },
 ];
 

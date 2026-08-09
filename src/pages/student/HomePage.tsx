@@ -121,49 +121,62 @@ export default function StudentHomePage() {
       <section>
         <div className="grid grid-cols-3 gap-2.5 sm:gap-5">
           {/* Card 1: Activities Completed Today */}
-          <div className="group relative p-3 sm:p-5 rounded-3xl bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/40 border border-indigo-100/80 shadow-md hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-4 overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-            <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-              <Flame size={22} className="stroke-[2.5] fill-white/20 animate-pulse" />
+          <div className="group relative p-3 sm:p-5 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 aspect-square sm:aspect-auto flex flex-col items-center justify-center sm:flex-row sm:items-start sm:justify-start text-center sm:text-left gap-1.5 sm:gap-4"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)', boxShadow: '0 6px 24px 0 #6366f155' }}>
+            {/* Shine overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none rounded-3xl" />
+            <div className="absolute bottom-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="w-9 h-9 sm:w-13 sm:h-13 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+              <Flame size={18} className="stroke-[2.5] text-white fill-white/30 animate-pulse sm:hidden" />
+              <Flame size={22} className="stroke-[2.5] text-white fill-white/30 animate-pulse hidden sm:block" />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-indigo-900/60 leading-tight">
-                Activities Completed
+            <div className="min-w-0 relative z-10">
+              <p className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-white/70 leading-tight">
+                <span className="sm:hidden">Activities</span>
+                <span className="hidden sm:inline">Activities Completed</span>
               </p>
-              <p className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 font-headline-md mt-0.5">
+              <p className="text-xl sm:text-3xl font-black text-white mt-0.5">
                 {stats.activitiesCompletedToday}
               </p>
             </div>
           </div>
 
           {/* Card 2: Average Accuracy */}
-          <div className="group relative p-3 sm:p-5 rounded-3xl bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/40 border border-emerald-100/80 shadow-md hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-4 overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
-            <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-              <Target size={22} className="stroke-[2.5]" />
+          <div className="group relative p-3 sm:p-5 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 aspect-square sm:aspect-auto flex flex-col items-center justify-center sm:flex-row sm:items-start sm:justify-start text-center sm:text-left gap-1.5 sm:gap-4"
+            style={{ background: 'linear-gradient(135deg, #10b981, #0d9488)', boxShadow: '0 6px 24px 0 #10b98155' }}>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none rounded-3xl" />
+            <div className="absolute bottom-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="w-9 h-9 sm:w-13 sm:h-13 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+              <Target size={18} className="stroke-[2.5] text-white sm:hidden" />
+              <Target size={22} className="stroke-[2.5] text-white hidden sm:block" />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-900/60 leading-tight">
-                Average Accuracy
+            <div className="min-w-0 relative z-10">
+              <p className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-white/70 leading-tight">
+                <span className="sm:hidden">Accuracy</span>
+                <span className="hidden sm:inline">Average Accuracy</span>
               </p>
-              <p className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600 font-headline-md mt-0.5">
+              <p className="text-xl sm:text-3xl font-black text-white mt-0.5">
                 {stats.avgAccuracy}%
               </p>
             </div>
           </div>
 
           {/* Card 3: XP Earned Today */}
-          <div className="group relative p-3 sm:p-5 rounded-3xl bg-gradient-to-br from-amber-50/80 via-white to-orange-50/40 border border-amber-100/80 shadow-md hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-4 overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
-            <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-              <Zap size={22} className="stroke-[2.5] fill-white/30" />
+          <div className="group relative p-3 sm:p-5 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 aspect-square sm:aspect-auto flex flex-col items-center justify-center sm:flex-row sm:items-start sm:justify-start text-center sm:text-left gap-1.5 sm:gap-4"
+            style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', boxShadow: '0 6px 24px 0 #f59e0b55' }}>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none rounded-3xl" />
+            <div className="absolute bottom-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="w-9 h-9 sm:w-13 sm:h-13 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 border border-white/30">
+              <Zap size={18} className="stroke-[2.5] text-white fill-white/30 sm:hidden" />
+              <Zap size={22} className="stroke-[2.5] text-white fill-white/30 hidden sm:block" />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-900/60 leading-tight">
-                XP Earned Today
+            <div className="min-w-0 relative z-10">
+              <p className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-white/70 leading-tight">
+                <span className="sm:hidden">XP Today</span>
+                <span className="hidden sm:inline">XP Earned Today</span>
               </p>
-              <p className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 font-headline-md mt-0.5">
-                {stats.xpEarnedToday.toLocaleString()} <span className="text-sm sm:text-lg">XP</span>
+              <p className="text-xl sm:text-3xl font-black text-white mt-0.5">
+                {stats.xpEarnedToday.toLocaleString()} <span className="text-xs sm:text-lg">XP</span>
               </p>
             </div>
           </div>
@@ -180,7 +193,7 @@ export default function StudentHomePage() {
       {/* Play Zone */}
       <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <h3 className="hidden sm:block text-2xl font-extrabold text-on-background">Play Zone</h3>
+          <h3 className="text-2xl font-extrabold text-on-background">Play Zone</h3>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
@@ -190,16 +203,36 @@ export default function StudentHomePage() {
               <div
                 key={activity.key}
                 onClick={handleActivityClick}
-                className="bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border border-surface-200 shadow-md flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full relative hover:border-primary/50"
+                className="group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                style={{
+                  background: '#ffffff',
+                  border: `1.5px solid ${cardColor}50`,
+                  boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`)}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
               >
+                {/* Glow blob */}
                 <div
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl drop-shadow-md"
-                  style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
+                  className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
+                  style={{ background: cardColor }}
+                />
+                <div
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
+                  style={{
+                    background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
+                    boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
+                  }}
                 >
                   {activity.emoji || '🎮'}
                 </div>
-                <div className="flex-grow">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
+                <div className="flex-grow relative z-10">
+                  <h4
+                    className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+                    style={{ color: cardColor }}
+                  >
+                    {activity.label}
+                  </h4>
                   <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
                 </div>
               </div>

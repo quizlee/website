@@ -305,11 +305,11 @@ Answers: mitochondria`
             value={activityType}
             onChange={(e) => handleTypeChange(e.target.value as ActivityType)}
             options={[
-              { value: 'quiz', label: 'Quiz' },
-              { value: 'flashcard', label: 'Flashcard' },
-              { value: 'matching', label: 'Matching' },
-              { value: 'picture', label: 'Picture Game' },
-              { value: 'dragndrop', label: 'Drag & Drop' },
+              { value: 'quiz', label: '⚡ Quiz Quest' },
+              { value: 'flashcard', label: '🔄 Flash Flip' },
+              { value: 'matching', label: '🧩 Match Mania' },
+              { value: 'picture', label: '🖼️ Pic Picasso' },
+              { value: 'dragndrop', label: '📥 Drag & Drop' },
             ]}
           />
 

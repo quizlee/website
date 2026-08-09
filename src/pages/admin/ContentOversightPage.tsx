@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../stores/authStore';
 import type { Content, School, Class, Subject, Chapter, Activity, ActivityType, ContentPayload } from '../../lib/types';
-import { Trash2, Edit, Play, BookOpen, School as SchoolIcon, Plus, Lock, Unlock, Eye, EyeOff, Upload, FileText, CheckCircle2, AlertCircle, ListFilter } from 'lucide-react';
+import { Trash2, Edit, Play, BookOpen, School as SchoolIcon, Plus, Lock, Unlock, Eye, EyeOff, Upload, FileText, CheckCircle2, AlertCircle, ListFilter, ChevronDown, Sparkles } from 'lucide-react';
 
 interface ValidationError {
   line: number;
@@ -17,7 +17,7 @@ interface ValidationError {
 
 export default function ContentOversightPage() {
   const { profile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'content' | 'import'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'import' | 'ai'>('content');
 
   const [contentList, setContentList] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +32,20 @@ export default function ContentOversightPage() {
   const [isValidated, setIsValidated] = useState(false);
   const [importing, setImporting] = useState(false);
 
+  // AI Generator states
+  const [aiChapterText, setAiChapterText] = useState('');
+  const [aiActivityType, setAiActivityType] = useState<ActivityType>('quiz');
+  const [aiCount, setAiCount] = useState<number | string>(10);
+  const [aiApiKey, setAiApiKey] = useState(localStorage.getItem('quizlee_gemini_api_key') || '');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [generatingChapters, setGeneratingChapters] = useState<Record<string, boolean>>({});
+  const [chapterGeneratedItems, setChapterGeneratedItems] = useState<Record<string, ContentPayload[]>>({});
+  const [chapterSelectedAiItemIds, setChapterSelectedAiItemIds] = useState<Record<string, number[]>>({});
+  const [chapterActivityTypes, setChapterActivityTypes] = useState<Record<string, ActivityType>>({});
+  const [aiImporting, setAiImporting] = useState(false);
+  const [uploadingChapterText, setUploadingChapterText] = useState(false);
+  const [deletingChapterText, setDeletingChapterText] = useState(false);
+
   // Filter lists
   const [schools, setSchools] = useState<School[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -45,6 +59,30 @@ export default function ContentOversightPage() {
   const [selectedChapter, setSelectedChapter] = useState(sessionStorage.getItem('oversight_filter_chapter') || '');
   const [selectedType, setSelectedType] = useState(sessionStorage.getItem('oversight_filter_type') || '');
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // Derived states for currently selected chapter
+  const isCurrentChapterGenerating = selectedChapter ? !!generatingChapters[selectedChapter] : false;
+  const generatedItems = selectedChapter ? (chapterGeneratedItems[selectedChapter] || []) : [];
+  const selectedAiItemIds = selectedChapter ? (chapterSelectedAiItemIds[selectedChapter] || []) : [];
+  const activeGeneratingChapterIds = Object.keys(generatingChapters).filter((id) => generatingChapters[id]);
+
+  const setSelectedAiItemIds = (updater: number[] | ((prev: number[]) => number[])) => {
+    if (!selectedChapter) return;
+    setChapterSelectedAiItemIds((prev) => {
+      const existing = prev[selectedChapter] || [];
+      const nextVal = typeof updater === 'function' ? updater(existing) : updater;
+      return { ...prev, [selectedChapter]: nextVal };
+    });
+  };
+
+  const setGeneratedItems = (updater: ContentPayload[] | ((prev: ContentPayload[]) => ContentPayload[])) => {
+    if (!selectedChapter) return;
+    setChapterGeneratedItems((prev) => {
+      const existing = prev[selectedChapter] || [];
+      const nextVal = typeof updater === 'function' ? updater(existing) : updater;
+      return { ...prev, [selectedChapter]: nextVal };
+    });
+  };
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -69,6 +107,80 @@ export default function ContentOversightPage() {
   const [showAddChapterFormSubjectId, setShowAddChapterFormSubjectId] = useState<string | null>(null);
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [chapterFormValue, setChapterFormValue] = useState('');
+
+  // Left panel resize state
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('oversight_left_panel_width');
+    return saved ? Math.max(220, Math.min(650, Number(saved))) : 320;
+  });
+  const [isDraggingLeftPanel, setIsDraggingLeftPanel] = useState(false);
+  const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showMobileExplorer, setShowMobileExplorer] = useState(true);
+  const [viewDensity, setViewDensity] = useState<'compact' | 'detailed'>('compact');
+
+  function getPayloadPreview(item: Content): string {
+    if (!item?.payload) return 'No content payload';
+    const p = item.payload as any;
+
+    if (item.activity_type === 'quiz') {
+      return p.question || 'Quiz Question';
+    }
+    if (item.activity_type === 'flashcard') {
+      return p.front && p.back ? `${p.front} ➔ ${p.back}` : (p.front || p.back || 'Flashcard Item');
+    }
+    if (item.activity_type === 'matching') {
+      if (Array.isArray(p.pairs) && p.pairs.length > 0) {
+        return p.pairs.map((pair: any) => `${pair.left} = ${pair.right}`).join(' | ');
+      }
+      return 'Matching Pairs';
+    }
+    if (item.activity_type === 'picture') {
+      return p.question ? `📷 ${p.question}` : 'Picture Game Question';
+    }
+    if (item.activity_type === 'dragndrop') {
+      return p.sentence || (Array.isArray(p.answers) ? p.answers.join(', ') : 'Drag & Drop Item');
+    }
+
+    if (typeof p === 'string') return p;
+    if (p.question) return p.question;
+    if (p.title) return p.title;
+    if (p.sentence) return p.sentence;
+    if (p.front) return p.front;
+    return JSON.stringify(p);
+  }
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileScreen(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleStartResizeLeftPanel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingLeftPanel(true);
+    const startX = e.clientX;
+    const startWidth = leftPanelWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(220, Math.min(650, startWidth + deltaX));
+      setLeftPanelWidth(newWidth);
+      localStorage.setItem('oversight_left_panel_width', newWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingLeftPanel(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -556,7 +668,364 @@ Answers: mitochondria`
     } finally {
       setImporting(false);
     }
-  }
+  };
+
+  // AI Generation Handler via real API call with automatic model selection
+  const handleGenerateAiQuestions = () => {
+    if (!aiChapterText.trim()) {
+      toast('Please enter or import the chapter text context first', 'warning');
+      return;
+    }
+    if (!selectedChapter) {
+      toast('Please select a destination chapter from the left sidebar', 'warning');
+      return;
+    }
+
+    const activeApiKey = aiApiKey.trim() || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+
+    if (!activeApiKey) {
+      toast('Please enter your Gemini API Key in the field above to run AI generation', 'warning');
+      return;
+    }
+
+    const targetChapterId = selectedChapter;
+    const chapterObj = chapters.find((c) => c.id === targetChapterId);
+    const chapterName = chapterObj?.name || 'Selected Chapter';
+    const targetChapterText = aiChapterText.trim();
+    const targetActivityType = aiActivityType;
+    const targetCount = Math.max(1, Math.min(50, parseInt(String(aiCount)) || 10));
+
+    // Mark chapter as generating
+    setGeneratingChapters((prev) => ({ ...prev, [targetChapterId]: true }));
+    setChapterActivityTypes((prev) => ({ ...prev, [targetChapterId]: targetActivityType }));
+    toast(`Started AI generation for "${chapterName}"... ✨`, 'info');
+
+    // Run generation asynchronously in background
+    (async () => {
+      const startTime = Date.now();
+      try {
+        const isBengali = /[\u0980-\u09FF]/.test(targetChapterText);
+        const langInstruction = isBengali
+          ? "CRITICAL: All questions, options, hints, and explanations MUST be written in fluent BENGALI language."
+          : "CRITICAL: All questions, options, hints, and explanations MUST be written in ENGLISH language.";
+
+        // 1. Dynamically query Google AI Studio for active models supporting generateContent for this API Key
+        const listResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${activeApiKey}`
+        );
+
+        if (!listResponse.ok) {
+          const errData = await listResponse.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `Invalid API Key or HTTP ${listResponse.status}`);
+        }
+
+        const listData = await listResponse.json();
+        const rawModels: any[] = listData?.models || [];
+        const supportedModelNames = rawModels
+          .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+          .map((m: any) => m.name.replace('models/', ''));
+
+        if (supportedModelNames.length === 0) {
+          throw new Error('No active Gemini models supporting question generation were found for this API Key.');
+        }
+
+        // 2. Prioritize stable models with highest free tier limits
+        const preferredList = [
+          'gemini-1.5-flash',
+          'gemini-1.5-flash-latest',
+          'gemini-1.5-flash-8b',
+          'gemini-1.5-pro',
+          'gemini-1.5-pro-latest',
+          'gemini-2.0-flash',
+          'gemini-2.0-flash-exp',
+        ];
+
+        const targetModels = [
+          ...preferredList.filter((m) => supportedModelNames.includes(m)),
+          ...supportedModelNames,
+        ];
+        const uniqueTargets = Array.from(new Set(targetModels));
+
+        // 3. Parallel Batch Chunking Configuration (Chunk size = 10 items per parallel request)
+        const CHUNK_SIZE = 10;
+        const numChunks = Math.ceil(targetCount / CHUNK_SIZE);
+        const textSubstrings = targetChapterText.substring(0, 8000);
+
+        const fetchChunk = async (chunkIndex: number): Promise<ContentPayload[]> => {
+          const chunkCount = Math.min(CHUNK_SIZE, targetCount - chunkIndex * CHUNK_SIZE);
+          const sectionInstruction = numChunks > 1
+            ? `Focus on key concepts from part ${chunkIndex + 1} of ${numChunks} of the provided chapter text.`
+            : '';
+
+          const chunkPrompt = `You are an expert educational content generator for a school learning app.
+Generate exactly ${chunkCount} high-quality, proper '${targetActivityType}' questions based strictly on the provided chapter text content.
+
+${sectionInstruction}
+
+Language Requirement:
+${langInstruction}
+
+JSON Output Format:
+Return ONLY a valid JSON array of objects. Do NOT wrap in markdown codeblocks (no \`\`\`json).
+
+Schema rules per activity type:
+- If activity type is 'quiz':
+  {"question": "Question text?", "options": ["Option 0", "Option 1", "Option 2", "Option 3"], "correct_answer": 0, "hint": "Hint text", "explanation": "Detailed explanation"}
+- If activity type is 'flashcard':
+  {"front": "Term / Question", "back": "Definition / Clear Answer"}
+- If activity type is 'matching':
+  {"pairs": [{"left": "Term 1", "right": "Match 1"}, {"left": "Term 2", "right": "Match 2"}, {"left": "Term 3", "right": "Match 3"}]}
+- If activity type is 'dragndrop':
+  {"sentence": "Sentence with __BLANK__ placeholder.", "answers": ["missing_word"]}
+- If activity type is 'picture':
+  {"image_url": "https://picsum.photos/400/300", "question": "Question text?", "options": ["Option 0", "Option 1", "Option 2", "Option 3"], "correct_answer": 0}
+
+Chapter Text Content:
+${textSubstrings}`;
+
+          let lastErr = '';
+
+          for (const modelEndpoint of uniqueTargets) {
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                let response = await fetch(
+                  `https://generativelanguage.googleapis.com/v1beta/models/${modelEndpoint}:generateContent?key=${activeApiKey}`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: chunkPrompt }] }],
+                      generationConfig: {
+                        response_mime_type: 'application/json',
+                      },
+                    }),
+                  }
+                );
+
+                if (!response.ok && response.status === 400) {
+                  response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${modelEndpoint}:generateContent?key=${activeApiKey}`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        contents: [{ parts: [{ text: chunkPrompt }] }],
+                      }),
+                    }
+                  );
+                }
+
+                if (response.status === 429) {
+                  const errJson = await response.json().catch(() => ({}));
+                  lastErr = errJson?.error?.message || 'Rate limit/Quota exceeded';
+                  await new Promise((res) => setTimeout(res, 2000));
+                  continue;
+                }
+
+                if (response.ok) {
+                  const data = await response.json();
+                  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                  const res = JSON.parse(cleanedText);
+
+                  if (Array.isArray(res)) {
+                    return res as ContentPayload[];
+                  }
+                } else {
+                  const errJson = await response.json().catch(() => ({}));
+                  lastErr = errJson?.error?.message || `HTTP ${response.status}`;
+                }
+              } catch (err: any) {
+                lastErr = err?.message || 'Network error';
+              }
+            }
+          }
+
+          throw new Error(lastErr || 'Batch generation failed across all available Gemini models');
+        };
+
+        const chunkPromises = Array.from({ length: numChunks }).map(async (_, idx) => {
+          if (idx > 0) {
+            await new Promise((res) => setTimeout(res, idx * 300));
+          }
+          return fetchChunk(idx);
+        });
+
+        const chunkResults = await Promise.all(chunkPromises);
+        const allGeneratedItems = chunkResults.flat().slice(0, targetCount);
+
+        if (allGeneratedItems.length === 0) {
+          throw new Error('No valid question items returned from Gemini API.');
+        }
+
+        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+
+        setChapterGeneratedItems((prev) => ({ ...prev, [targetChapterId]: allGeneratedItems }));
+        setChapterSelectedAiItemIds((prev) => ({ ...prev, [targetChapterId]: allGeneratedItems.map((_, i) => i) }));
+        toast(`Successfully generated ${allGeneratedItems.length} questions for "${chapterName}" in ${elapsedSec}s! ✨`, 'success');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'AI generation failed';
+        toast(`API Error for "${chapterName}": ${message}`, 'error');
+      } finally {
+        setGeneratingChapters((prev) => ({ ...prev, [targetChapterId]: false }));
+      }
+    })();
+  };
+
+  const handleAiImport = async () => {
+    if (!selectedChapter) {
+      toast('Please select a destination chapter from the left sidebar first', 'warning');
+      return;
+    }
+    const itemsToImport = (chapterGeneratedItems[selectedChapter] || []).filter((_, idx) => (chapterSelectedAiItemIds[selectedChapter] || []).includes(idx));
+    if (itemsToImport.length === 0) {
+      toast('Please select at least one generated item to import', 'warning');
+      return;
+    }
+
+    setAiImporting(true);
+
+    try {
+      const targetActivityType = chapterActivityTypes[selectedChapter] || aiActivityType;
+      const inserts = itemsToImport.map((payload) => ({
+        chapter_id: selectedChapter,
+        activity_type: targetActivityType,
+        payload,
+        created_by: profile?.id,
+      }));
+
+      const { error } = await supabase.from('content').insert(inserts);
+
+      if (error) throw error;
+
+      toast(`Successfully imported ${itemsToImport.length} item(s) to database! 🎉`, 'success');
+      setChapterGeneratedItems((prev) => ({ ...prev, [selectedChapter]: [] }));
+      setChapterSelectedAiItemIds((prev) => ({ ...prev, [selectedChapter]: [] }));
+      await applyFilter();
+      setActiveTab('content');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      toast(message, 'error');
+    } finally {
+      setAiImporting(false);
+    }
+  };
+
+  // Upload chapter text context for selected chapter to database
+  const handleUploadChapterText = async () => {
+    if (!selectedChapter) {
+      toast('Please select a destination chapter from the left sidebar first', 'warning');
+      return;
+    }
+    if (!aiChapterText.trim()) {
+      toast('Please enter chapter text content to upload', 'warning');
+      return;
+    }
+
+    setUploadingChapterText(true);
+    try {
+      // Find existing chapter_text content item
+      const { data: list, error: listError } = await supabase
+        .from('content')
+        .select('id, payload')
+        .eq('chapter_id', selectedChapter);
+
+      if (listError) throw listError;
+
+      const existing = list?.find((item) => (item.payload as any)?._is_chapter_text === true);
+
+      if (existing) {
+        const { error } = await supabase
+          .from('content')
+          .update({ payload: { _is_chapter_text: true, text: aiChapterText.trim() } })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('content').insert({
+          chapter_id: selectedChapter,
+          activity_type: 'quiz',
+          payload: { _is_chapter_text: true, text: aiChapterText.trim() },
+          created_by: profile?.id,
+        });
+        if (error) throw error;
+      }
+
+      localStorage.setItem(`quizlee_chapter_text_${selectedChapter}`, aiChapterText.trim());
+      toast('Chapter text uploaded & saved for this chapter! 📄', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      toast(`Upload error: ${msg}`, 'error');
+    } finally {
+      setUploadingChapterText(false);
+    }
+  };
+
+  // Delete saved chapter text context for selected chapter from database
+  const handleDeleteChapterText = async () => {
+    if (!selectedChapter) {
+      toast('Please select a destination chapter from the left sidebar first', 'warning');
+      return;
+    }
+
+    setDeletingChapterText(true);
+    try {
+      const { data: list } = await supabase
+        .from('content')
+        .select('id, payload')
+        .eq('chapter_id', selectedChapter);
+
+      const existing = list?.find((item) => (item.payload as any)?._is_chapter_text === true);
+
+      if (existing) {
+        const { error } = await supabase
+          .from('content')
+          .delete()
+          .eq('id', existing.id);
+        if (error) throw error;
+      }
+
+      localStorage.removeItem(`quizlee_chapter_text_${selectedChapter}`);
+      setAiChapterText('');
+      toast('Chapter text deleted for this chapter! 🗑️', 'info');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Delete failed';
+      toast(`Delete error: ${msg}`, 'error');
+    } finally {
+      setDeletingChapterText(false);
+    }
+  };
+
+  // Auto-load chapter text when selectedChapter changes
+  useEffect(() => {
+    if (!selectedChapter) {
+      setAiChapterText('');
+      return;
+    }
+
+    async function loadSavedChapterText() {
+      const localText = localStorage.getItem(`quizlee_chapter_text_${selectedChapter}`);
+      if (localText) {
+        setAiChapterText(localText);
+      }
+
+      const { data: list } = await supabase
+        .from('content')
+        .select('*')
+        .eq('chapter_id', selectedChapter);
+
+      const found = list?.find((item) => (item.payload as any)?._is_chapter_text === true);
+
+      if (found && found.payload && typeof found.payload === 'object' && 'text' in found.payload) {
+        const textFromDb = (found.payload as any).text || '';
+        setAiChapterText(textFromDb);
+        localStorage.setItem(`quizlee_chapter_text_${selectedChapter}`, textFromDb);
+      } else if (!localText) {
+        setAiChapterText('');
+      }
+    }
+
+    loadSavedChapterText();
+  }, [selectedChapter]);
 
   // Apply filters
   async function applyFilter() {
@@ -611,7 +1080,9 @@ Answers: mitochondria`
     }
 
     const { data } = await query.order('created_at', { ascending: false });
-    setContentList(data as Content[] || []);
+    const rawList = (data as Content[]) || [];
+    const validQuestions = rawList.filter((item) => !(item.payload as any)?._is_chapter_text);
+    setContentList(validQuestions);
   }
 
   // Automatic filter execution
@@ -716,25 +1187,61 @@ Answers: mitochondria`
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+      {/* Mobile Toggle Button for Curriculum Explorer */}
+      <button
+        type="button"
+        onClick={() => setShowMobileExplorer((prev) => !prev)}
+        className="md:hidden flex items-center justify-between w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl mb-3 text-xs font-bold text-surface-800 shadow-2xs cursor-pointer hover:bg-surface-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <BookOpen size={16} className="text-primary-600" />
+          <span>Curriculum Explorer</span>
+          {(selectedSchool || selectedClass || selectedSubject || selectedChapter) && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-primary-100 text-primary-700">
+              Filter Active
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-primary-600 text-[11px] font-bold">
+          <span>{showMobileExplorer ? 'Hide' : 'Show'}</span>
+          <ChevronDown size={14} className={`transition-transform duration-200 ${showMobileExplorer ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      <div className="flex flex-col md:flex-row gap-0 md:gap-3 items-stretch relative">
         {/* Left side: Navigation Explorer (School > Class > Subject > Chapter tree with inline management) */}
-        <div className="md:col-span-3 flex flex-col gap-4 max-h-[calc(100vh-140px)] min-h-[600px] overflow-y-auto bg-white p-4">
+        <div
+          style={{ width: isMobileScreen ? '100%' : `${leftPanelWidth}px` }}
+          className={`w-full shrink-0 flex-col gap-4 bg-white p-4 rounded-xl border border-surface-200 shadow-2xs ${
+            isMobileScreen && !showMobileExplorer ? 'hidden' : 'flex'
+          } ${isMobileScreen ? 'max-h-[450px] mb-4' : 'max-h-[calc(100vh-140px)] min-h-[600px]'} overflow-y-auto`}
+        >
           <div className="border-b border-surface-200 pb-3 mb-2 flex justify-between items-center">
             <div>
-              <h2 className="text-sm font-bold text-surface-800 uppercase tracking-wider">Curriculum Explorer</h2>
-              <p className="text-xs text-surface-400 mt-1">Manage & filter by curriculum levels.</p>
+              <h2 className="text-base font-extrabold text-surface-900 uppercase tracking-wider">Curriculum Explorer</h2>
+              <p className="text-xs text-surface-500 mt-0.5">Manage & filter by curriculum levels.</p>
             </div>
-            <button
-              onClick={() => {
-                setSelectedSchool('');
-                setSelectedClass('');
-                setSelectedSubject('');
-                setSelectedChapter('');
-              }}
-              className="text-xs text-primary bg-primary-50 hover:bg-primary-100 px-2 py-1 rounded-lg font-bold transition-all cursor-pointer"
-            >
-              Clear
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setSelectedSchool('');
+                  setSelectedClass('');
+                  setSelectedSubject('');
+                  setSelectedChapter('');
+                }}
+                className="text-xs text-primary bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMobileExplorer(false)}
+                className="md:hidden text-xs text-surface-600 hover:text-surface-900 bg-surface-100 hover:bg-surface-200 px-2 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                title="Hide Explorer"
+              >
+                Hide
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -770,7 +1277,7 @@ Answers: mitochondria`
                       setSchoolFormValue('');
                     }
                   }}
-                  className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                  className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                 >
                   Save
                 </button>
@@ -780,7 +1287,7 @@ Answers: mitochondria`
                     setShowAddSchoolForm(false);
                     setSchoolFormValue('');
                   }}
-                  className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                  className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -792,9 +1299,9 @@ Answers: mitochondria`
                   setShowAddSchoolForm(true);
                   setSchoolFormValue('');
                 }}
-                className="text-[11px] text-slate-500 hover:text-primary font-bold py-1.5 flex items-center gap-1 cursor-pointer border-b border-surface-100 pb-2 mb-2 w-full text-left"
+                className="text-xs text-slate-600 hover:text-primary font-bold py-1.5 flex items-center gap-1 cursor-pointer border-b border-surface-100 pb-2 mb-2 w-full text-left"
               >
-                <Plus size={12} /> Add School
+                <Plus size={13} /> Add School
               </button>
             )}
 
@@ -836,7 +1343,7 @@ Answers: mitochondria`
                               setSchoolFormValue('');
                             }
                           }}
-                          className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                          className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                         >
                           Save
                         </button>
@@ -846,7 +1353,7 @@ Answers: mitochondria`
                             setEditingSchoolId(null);
                             setSchoolFormValue('');
                           }}
-                          className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                          className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -865,11 +1372,11 @@ Answers: mitochondria`
                             isSchoolExpanded ? 'text-primary-600 font-bold' : 'hover:text-surface-900 text-surface-700 font-semibold'
                           }`}
                         >
-                          <span className="flex items-center gap-2 text-xs truncate">
-                            <SchoolIcon size={14} className={isSchoolExpanded ? 'text-primary shrink-0' : 'text-surface-400 shrink-0'} />
+                          <span className="flex items-center gap-2 text-sm truncate font-semibold">
+                            <SchoolIcon size={16} className={isSchoolExpanded ? 'text-primary shrink-0' : 'text-surface-400 shrink-0'} />
                             <span className="truncate">{school.name}</span>
                           </span>
-                          <span className="text-[10px] text-surface-400 ml-1">{isSchoolExpanded ? '▼' : '▶'}</span>
+                          <span className="text-xs text-surface-400 ml-1">{isSchoolExpanded ? '▼' : '▶'}</span>
                         </button>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -882,7 +1389,7 @@ Answers: mitochondria`
                             className="p-0.5 text-slate-400 hover:text-primary cursor-pointer"
                             title="Edit School"
                           >
-                            <Edit size={11} />
+                            <Edit size={13} />
                           </button>
                           <button
                             type="button"
@@ -893,7 +1400,7 @@ Answers: mitochondria`
                             className="p-0.5 text-slate-400 hover:text-rose-500 cursor-pointer"
                             title="Delete School"
                           >
-                            <Trash2 size={11} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </div>
@@ -952,7 +1459,7 @@ Answers: mitochondria`
                                   </button>
                                 </div>
                               ) : (
-                                <div className="flex items-center justify-between pl-3 pr-1 py-0.5 hover:bg-surface-50 group rounded">
+                               <div className="flex items-center justify-between pl-3 pr-1 py-0.5 hover:bg-surface-50 group rounded">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -960,11 +1467,11 @@ Answers: mitochondria`
                                       setSelectedSubject('');
                                       setSelectedChapter('');
                                     }}
-                                    className={`flex-grow flex items-center gap-2 text-left py-0.5 text-xs font-semibold cursor-pointer truncate ${
+                                    className={`flex-grow flex items-center gap-2 text-left py-0.5 text-sm font-semibold cursor-pointer truncate ${
                                       isClassExpanded ? 'text-primary font-bold' : 'text-slate-600'
                                     }`}
                                   >
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isClassExpanded ? 'bg-primary-500' : 'bg-surface-300'}`} />
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${isClassExpanded ? 'bg-primary-500' : 'bg-surface-300'}`} />
                                     <span className="truncate">{cls.name}</span>
                                   </button>
                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -978,7 +1485,7 @@ Answers: mitochondria`
                                       className="p-0.5 text-slate-400 hover:text-primary cursor-pointer"
                                       title="Edit Class"
                                     >
-                                      <Edit size={11} />
+                                      <Edit size={13} />
                                     </button>
                                     <button
                                       type="button"
@@ -989,7 +1496,7 @@ Answers: mitochondria`
                                       className="p-0.5 text-slate-400 hover:text-rose-500 cursor-pointer"
                                       title="Delete Class"
                                     >
-                                      <Trash2 size={11} />
+                                      <Trash2 size={13} />
                                     </button>
                                   </div>
                                 </div>
@@ -998,7 +1505,7 @@ Answers: mitochondria`
                               {isClassExpanded && (
                                 <div className="pl-4 pr-1 py-0.5 space-y-0.5 ml-2 mt-0.5">
                                   {subjects.length === 0 ? (
-                                    <p className="text-[10px] text-surface-400 pl-3 py-1 italic">No subjects</p>
+                                    <p className="text-xs text-surface-400 pl-3 py-1 italic">No subjects</p>
                                   ) : (
                                     subjects.map((subj) => {
                                       const isSubjExpanded = selectedSubject === subj.id;
@@ -1035,7 +1542,7 @@ Answers: mitochondria`
                                                     setSubjectFormValue('');
                                                   }
                                                 }}
-                                                className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                                                className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                                               >
                                                 Save
                                               </button>
@@ -1045,7 +1552,7 @@ Answers: mitochondria`
                                                   setEditingSubjectId(null);
                                                   setSubjectFormValue('');
                                                 }}
-                                                className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                                                className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                                               >
                                                 Cancel
                                               </button>
@@ -1058,11 +1565,11 @@ Answers: mitochondria`
                                                   setSelectedSubject(isSubjExpanded ? '' : subj.id);
                                                   setSelectedChapter('');
                                                 }}
-                                                className={`flex-grow flex items-center gap-1.5 text-left py-0.5 text-xs font-semibold cursor-pointer truncate ${
-                                                  isSubjExpanded ? 'text-primary font-bold' : 'text-slate-500'
+                                                className={`flex-grow flex items-center gap-1.5 text-left py-0.5 text-sm font-semibold cursor-pointer truncate ${
+                                                  isSubjExpanded ? 'text-primary font-bold' : 'text-slate-600'
                                                 }`}
                                               >
-                                                <BookOpen size={11} className={isSubjExpanded ? 'text-primary shrink-0' : 'text-slate-400 shrink-0'} />
+                                                <BookOpen size={14} className={isSubjExpanded ? 'text-primary shrink-0' : 'text-slate-400 shrink-0'} />
                                                 <span className="truncate">{subj.name}</span>
                                               </button>
                                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1076,7 +1583,7 @@ Answers: mitochondria`
                                                   className="p-0.5 text-slate-400 hover:text-primary cursor-pointer"
                                                   title="Edit Subject"
                                                 >
-                                                  <Edit size={11} />
+                                                  <Edit size={13} />
                                                 </button>
                                                 <button
                                                   type="button"
@@ -1087,7 +1594,7 @@ Answers: mitochondria`
                                                   className="p-0.5 text-slate-400 hover:text-rose-500 cursor-pointer"
                                                   title="Delete Subject"
                                                 >
-                                                  <Trash2 size={11} />
+                                                  <Trash2 size={13} />
                                                 </button>
                                               </div>
                                             </div>
@@ -1096,9 +1603,9 @@ Answers: mitochondria`
                                           {isSubjExpanded && (
                                             <div className="pl-3 pr-1 py-0.5 space-y-0.5 ml-2 mt-0.5">
                                               {chapters.length === 0 ? (
-                                                <p className="text-[10px] text-surface-400 pl-2 py-1 italic">No chapters</p>
+                                                <p className="text-xs text-surface-400 pl-2 py-1 italic">No chapters</p>
                                               ) : (
-                                                chapters.map((chap) => {
+                                                chapters.map((chap, chapIdx) => {
                                                   const isChapSelected = selectedChapter === chap.id;
                                                   const isEditingChap = editingChapterId === chap.id;
                                                   return (
@@ -1133,7 +1640,7 @@ Answers: mitochondria`
                                                                 setChapterFormValue('');
                                                               }
                                                             }}
-                                                            className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                                                            className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                                                           >
                                                             Save
                                                           </button>
@@ -1143,7 +1650,7 @@ Answers: mitochondria`
                                                               setEditingChapterId(null);
                                                               setChapterFormValue('');
                                                             }}
-                                                            className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                                                            className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                                                           >
                                                             Cancel
                                                           </button>
@@ -1155,11 +1662,20 @@ Answers: mitochondria`
                                                             onClick={() => {
                                                               setSelectedChapter(isChapSelected ? '' : chap.id);
                                                             }}
-                                                            className={`flex-grow flex items-center gap-1.5 text-left text-xs font-semibold cursor-pointer truncate ${
-                                                              isChapSelected ? 'text-primary font-bold' : 'text-slate-500 hover:text-slate-800'
+                                                            className={`flex-grow flex items-center gap-1.5 text-left text-sm font-semibold cursor-pointer truncate ${
+                                                              isChapSelected ? 'text-primary font-bold' : 'text-slate-600 hover:text-slate-900'
                                                             }`}
                                                           >
-                                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isChapSelected ? 'bg-primary-500' : 'bg-surface-300'}`} />
+                                                            <span className={`text-xs font-extrabold px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1 ${
+                                                              generatingChapters[chap.id]
+                                                                ? 'bg-amber-500 text-white animate-pulse'
+                                                                : isChapSelected
+                                                                ? 'bg-primary-500 text-white'
+                                                                : 'bg-surface-200 text-surface-700'
+                                                            }`}>
+                                                              {generatingChapters[chap.id] && <Sparkles size={11} className="animate-spin text-white" />}
+                                                              C{chapIdx + 1}
+                                                            </span>
                                                             <span className="truncate">{chap.name}</span>
                                                           </button>
 
@@ -1176,7 +1692,7 @@ Answers: mitochondria`
                                                               }`}
                                                               title={chap.is_locked ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
                                                             >
-                                                              {chap.is_locked ? <Lock size={11} /> : <Unlock size={11} />}
+                                                              {chap.is_locked ? <Lock size={13} /> : <Unlock size={13} />}
                                                             </button>
 
                                                             {/* Active/Inactive Toggle */}
@@ -1191,7 +1707,7 @@ Answers: mitochondria`
                                                               }`}
                                                               title={chap.is_active ? 'Active (Click to Deactivate)' : 'Inactive (Click to Activate)'}
                                                             >
-                                                              {chap.is_active ? <Eye size={11} /> : <EyeOff size={11} />}
+                                                              {chap.is_active ? <Eye size={13} /> : <EyeOff size={13} />}
                                                             </button>
 
                                                             {/* Edit Button */}
@@ -1205,7 +1721,7 @@ Answers: mitochondria`
                                                               className="p-0.5 text-slate-400 hover:text-primary cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                                                               title="Edit Chapter"
                                                             >
-                                                              <Edit size={11} />
+                                                              <Edit size={13} />
                                                             </button>
 
                                                             {/* Delete Button */}
@@ -1218,7 +1734,7 @@ Answers: mitochondria`
                                                               className="p-0.5 text-slate-400 hover:text-rose-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                                                               title="Delete Chapter"
                                                             >
-                                                              <Trash2 size={11} />
+                                                              <Trash2 size={13} />
                                                             </button>
                                                           </div>
                                                         </>
@@ -1260,7 +1776,7 @@ Answers: mitochondria`
                                                         setChapterFormValue('');
                                                       }
                                                     }}
-                                                    className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                                                    className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                                                   >
                                                     Save
                                                   </button>
@@ -1270,7 +1786,7 @@ Answers: mitochondria`
                                                       setShowAddChapterFormSubjectId(null);
                                                       setChapterFormValue('');
                                                     }}
-                                                    className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                                                    className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                                                   >
                                                     Cancel
                                                   </button>
@@ -1282,9 +1798,9 @@ Answers: mitochondria`
                                                     setShowAddChapterFormSubjectId(subj.id);
                                                     setChapterFormValue('');
                                                   }}
-                                                  className="text-[10px] text-slate-400 hover:text-primary font-bold pl-2 py-1 flex items-center gap-1 cursor-pointer"
+                                                  className="text-xs text-slate-500 hover:text-primary font-bold pl-2 py-1 flex items-center gap-1 cursor-pointer"
                                                 >
-                                                  <Plus size={10} /> Add Chapter
+                                                  <Plus size={12} /> Add Chapter
                                                 </button>
                                               )}
                                             </div>
@@ -1326,7 +1842,7 @@ Answers: mitochondria`
                                             setSubjectFormValue('');
                                           }
                                         }}
-                                        className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                                        className="text-xs text-emerald-600 font-bold hover:underline cursor-pointer"
                                       >
                                         Save
                                       </button>
@@ -1336,7 +1852,7 @@ Answers: mitochondria`
                                           setShowAddSubjectFormClassId(null);
                                           setSubjectFormValue('');
                                         }}
-                                        className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                                        className="text-xs text-slate-400 font-bold hover:underline cursor-pointer"
                                       >
                                         Cancel
                                       </button>
@@ -1348,7 +1864,7 @@ Answers: mitochondria`
                                         setShowAddSubjectFormClassId(cls.id);
                                         setSubjectFormValue('');
                                       }}
-                                      className="text-[10px] text-slate-400 hover:text-primary font-bold pl-3 py-1 flex items-center gap-1 cursor-pointer"
+                                      className="text-xs text-slate-500 hover:text-primary font-bold pl-3 py-1 flex items-center gap-1 cursor-pointer"
                                     >
                                       <Plus size={10} /> Add Subject
                                     </button>
@@ -1427,8 +1943,23 @@ Answers: mitochondria`
           </div>
         </div>
 
+        {/* Resizer Handle (Desktop only) */}
+        <div
+          onMouseDown={handleStartResizeLeftPanel}
+          className={`hidden md:flex items-center justify-center w-3 cursor-col-resize select-none shrink-0 group z-10 hover:bg-primary-50/50 rounded-lg transition-colors ${
+            isDraggingLeftPanel ? 'bg-primary-100/60' : ''
+          }`}
+          title="Hold & drag to resize left panel"
+        >
+          <div className={`w-1 h-16 rounded-full transition-all ${
+            isDraggingLeftPanel
+              ? 'bg-primary-600 scale-y-125 shadow-sm shadow-primary-500/50'
+              : 'bg-surface-300 group-hover:bg-primary-500 group-hover:scale-y-110'
+          }`} />
+        </div>
+
         {/* Right side: Content oversight list and Bulk Import Tabs */}
-        <div className="md:col-span-9 flex flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto">
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Top Tabs Header */}
           <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-surface-200 p-1.5 rounded-2xl shrink-0">
             <div className="flex items-center gap-1.5">
@@ -1455,6 +1986,18 @@ Answers: mitochondria`
               >
                 <Upload size={15} />
                 Bulk Import
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'ai'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm'
+                    : 'text-surface-600 hover:bg-surface-100'
+                }`}
+              >
+                <Sparkles size={15} className="text-amber-300" />
+                AI Generate
               </button>
             </div>
 
@@ -1548,31 +2091,60 @@ Answers: mitochondria`
                 </div>
               </Card>
 
-              {/* Select All Action Banner */}
+              {/* Select All Action Banner & View Mode Toggle */}
               {!loading && contentList.length > 0 && (
-                <div className="flex items-center justify-between bg-white border border-surface-200 rounded-2xl px-4 py-3 text-sm">
-                  <div className="flex items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      id="select-all"
-                      checked={contentList.length > 0 && selectedIds.length === contentList.length}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
-                    />
-                    <label htmlFor="select-all" className="font-semibold text-surface-700 select-none cursor-pointer">
-                      Select All ({contentList.length})
-                    </label>
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-surface-200 rounded-2xl px-4 py-2.5 text-sm shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="select-all"
+                        checked={contentList.length > 0 && selectedIds.length === contentList.length}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      />
+                      <label htmlFor="select-all" className="font-bold text-surface-700 select-none cursor-pointer">
+                        Select All ({contentList.length})
+                      </label>
+                    </div>
+                    {selectedIds.length > 0 && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        icon={<Trash2 size={13} />}
+                        onClick={handleBulkDelete}
+                        className="py-1 px-2.5 text-xs"
+                      >
+                        Delete Selected ({selectedIds.length})
+                      </Button>
+                    )}
                   </div>
-                  {selectedIds.length > 0 && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      icon={<Trash2 size={14} />}
-                      onClick={handleBulkDelete}
+
+                  {/* View Density Switch */}
+                  <div className="flex items-center gap-1 bg-surface-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setViewDensity('compact')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        viewDensity === 'compact'
+                          ? 'bg-white text-primary-700 shadow-2xs'
+                          : 'text-surface-600 hover:text-surface-900'
+                      }`}
                     >
-                      Delete Selected ({selectedIds.length})
-                    </Button>
-                  )}
+                      Compact List
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewDensity('detailed')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        viewDensity === 'detailed'
+                          ? 'bg-white text-primary-700 shadow-2xs'
+                          : 'text-surface-600 hover:text-surface-900'
+                      }`}
+                    >
+                      Detailed Cards
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1583,8 +2155,89 @@ Answers: mitochondria`
                 <Card className="text-center py-20 bg-white">
                   <p className="text-surface-500 font-medium">No content items found for this selection.</p>
                 </Card>
+              ) : viewDensity === 'compact' ? (
+                /* Compact List View */
+                <div className="bg-white border border-surface-200 rounded-2xl divide-y divide-surface-100 overflow-y-auto max-h-[calc(100vh-440px)] min-h-[180px] shadow-2xs">
+                  {contentList.map((item, idx) => {
+                    const isSelected = selectedIds.includes(item.id);
+                    const chapterName = chapters.find((c) => c.id === item.chapter_id)?.name;
+                    const previewText = getPayloadPreview(item);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-2.5 px-3.5 py-2 text-xs transition-colors hover:bg-surface-50 ${
+                          isSelected ? 'bg-primary-50/40' : ''
+                        }`}
+                      >
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelect(item.id)}
+                          className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0"
+                        />
+
+                        {/* Question Index */}
+                        <span className="text-[11px] font-bold text-surface-400 w-6 shrink-0 text-right">
+                          #{idx + 1}
+                        </span>
+
+                        {/* Activity Badge */}
+                        <span className="shrink-0">
+                          <Badge
+                            variant={
+                              item.activity_type === 'quiz' ? 'info' :
+                              item.activity_type === 'flashcard' ? 'default' :
+                              (item.activity_type as string) === 'matching' ? 'success' :
+                              (item.activity_type as string) === 'picture' ? 'danger' : 'warning'
+                            }
+                            size="sm"
+                            className="text-[10px] px-2 py-0.5"
+                          >
+                            {item.activity_type === 'quiz' ? 'Quiz' :
+                             item.activity_type === 'flashcard' ? 'Flashcard' :
+                             item.activity_type === 'matching' ? 'Matching' :
+                             item.activity_type === 'picture' ? 'Picture' :
+                             item.activity_type === 'dragndrop' ? 'DragDrop' : item.activity_type}
+                          </Badge>
+                        </span>
+
+                        {/* Question Preview Text */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-surface-800 line-clamp-2 text-xs leading-relaxed" title={previewText}>
+                            {previewText}
+                          </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingContent(item);
+                              setPayloadText(JSON.stringify(item.payload, null, 2));
+                              setShowModal(true);
+                            }}
+                            className="p-1 hover:bg-surface-100 text-surface-600 hover:text-surface-900 rounded cursor-pointer transition-colors"
+                            title="Edit Payload"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-1 hover:bg-danger-50 text-danger-500 rounded cursor-pointer transition-colors"
+                            title="Delete Item"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <div className="flex flex-col gap-3">
+                /* Detailed Cards View */
+                <div className="flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-440px)] min-h-[180px] pr-1">
                   {contentList.map((item) => (
                     <Card key={item.id} className="flex items-center gap-4 bg-white" padding="sm">
                       <input
@@ -1618,17 +2271,10 @@ Answers: mitochondria`
                           {JSON.stringify(item.payload)}
                         </p>
                         <p className="text-[10px] text-surface-400 mt-1">
-                          Chapter: {chapters.find(c => c.id === item.chapter_id)?.name || 'Loading name...'} | Created: {new Date(item.created_at).toLocaleDateString()}
+                          Created: {new Date(item.created_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handlePlayContent(item)}
-                          className="p-2 hover:bg-primary-50 text-primary hover:text-primary-700 rounded-lg cursor-pointer transition-colors"
-                          title="Play Activity"
-                        >
-                          <Play size={16} className="fill-current" />
-                        </button>
                         <button
                           onClick={() => {
                             setEditingContent(item);
@@ -1653,7 +2299,7 @@ Answers: mitochondria`
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'import' ? (
             /* Bulk Import Panel */
             <div className="flex flex-col gap-4 animate-fade-in">
               {/* Destination & Activity Filters Card */}
@@ -1786,6 +2432,293 @@ Answers: mitochondria`
                   </Button>
                 )}
               </div>
+            </div>
+          ) : (
+            /* AI Generation Panel */
+            <div className="flex flex-col gap-4 animate-fade-in">
+              {/* Active Background Generations Banner */}
+              {activeGeneratingChapterIds.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs font-bold text-amber-900 shadow-2xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Sparkles size={16} className="text-amber-600 animate-spin shrink-0" />
+                    <span>Background AI Generation active for {activeGeneratingChapterIds.length} chapter(s):</span>
+                    {activeGeneratingChapterIds.map((cId) => {
+                      const cName = chapters.find((ch) => ch.id === cId)?.name || 'Chapter';
+                      const isCurrent = selectedChapter === cId;
+                      return (
+                        <button
+                          key={cId}
+                          type="button"
+                          onClick={() => setSelectedChapter(cId)}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-extrabold cursor-pointer transition-all flex items-center gap-1.5 ${
+                            isCurrent
+                              ? 'bg-amber-600 text-white shadow-xs'
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                          }`}
+                        >
+                          <Sparkles size={12} className="animate-spin" /> {cName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Destination & Activity Setup Card */}
+              <Card padding="sm" className="bg-white">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-surface-100 pb-2">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-surface-500">Target Destination: </span>
+                      <span className="text-xs font-bold text-primary-600">
+                        {selectedChapter 
+                          ? `${schools.find(s=>s.id===selectedSchool)?.name || ''} · ${classes.find(c=>c.id===selectedClass)?.name || ''} · ${subjects.find(s=>s.id===selectedSubject)?.name || ''} · ${chapters.find(c=>c.id===selectedChapter)?.name || ''}`
+                          : '⚠️ None selected (Select a chapter in the left sidebar)'
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Settings Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Activity Type Selection */}
+                    <div>
+                      <label className="text-xs font-bold text-surface-600 block mb-1">Activity Type</label>
+                      <select
+                        value={aiActivityType}
+                        onChange={(e) => setAiActivityType(e.target.value as ActivityType)}
+                        className="w-full text-xs font-bold px-3 py-2 border border-surface-200 rounded-xl bg-white focus:outline-none focus:border-primary-500"
+                      >
+                        {activities.map((act) => (
+                          <option key={act.key} value={act.key}>
+                            {act.emoji || '🎮'} {act.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Question Count Input */}
+                    <div>
+                      <label className="text-xs font-bold text-surface-600 block mb-1">Questions Count</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={aiCount}
+                        onChange={(e) => setAiCount(e.target.value)}
+                        onBlur={() => {
+                          const val = parseInt(String(aiCount), 10);
+                          if (isNaN(val) || val < 1) setAiCount(1);
+                          else if (val > 50) setAiCount(50);
+                          else setAiCount(val);
+                        }}
+                        className="w-full text-xs font-bold px-3 py-2 border border-surface-200 rounded-xl bg-white focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+
+                    {/* Gemini API Key Input */}
+                    <div>
+                      <label className="text-xs font-bold text-surface-600 block mb-1">Gemini API Key</label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          placeholder="Paste Gemini API Key..."
+                          value={aiApiKey}
+                          onChange={(e) => {
+                            setAiApiKey(e.target.value);
+                            localStorage.setItem('quizlee_gemini_api_key', e.target.value);
+                          }}
+                          className="w-full text-xs font-mono px-3 py-2 pr-9 border border-surface-200 rounded-xl bg-white focus:outline-none focus:border-primary-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-2 text-surface-400 hover:text-surface-700 p-1 rounded transition-colors cursor-pointer"
+                          title={showApiKey ? 'Hide API Key' : 'Show API Key'}
+                        >
+                          {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Text Import Area */}
+              <Card className="bg-white">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-surface-600 uppercase tracking-wider">
+                      Paste / Import Whole Chapter Text
+                    </label>
+                    <span className="text-xs text-surface-400 font-mono">
+                      {aiChapterText.length} characters | {aiChapterText.split(/\s+/).filter(Boolean).length} words
+                    </span>
+                  </div>
+                  <textarea
+                    value={aiChapterText}
+                    onChange={(e) => setAiChapterText(e.target.value)}
+                    rows={6}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-surface-200 bg-white text-surface-800 text-xs leading-relaxed focus:outline-none focus:border-primary-400"
+                    placeholder="Paste the raw text format of the chapter here (e.g. textbook notes, story text, definitions, or study material)..."
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-2 pt-2 border-t border-surface-100">
+                    {/* Left aligned: Upload & Delete chapter text */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUploadChapterText}
+                        loading={uploadingChapterText}
+                        disabled={!selectedChapter || !aiChapterText.trim()}
+                        icon={<Upload size={14} />}
+                        className="font-bold text-xs"
+                        title="Upload & save chapter text to database"
+                      >
+                        Upload
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDeleteChapterText}
+                        loading={deletingChapterText}
+                        disabled={!selectedChapter || !aiChapterText.trim()}
+                        icon={<Trash2 size={14} />}
+                        className="font-bold text-xs text-danger-600 hover:bg-danger-50"
+                        title="Delete saved chapter text from database"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+
+                    {/* Right aligned: Generate button */}
+                    <Button
+                      onClick={handleGenerateAiQuestions}
+                      loading={isCurrentChapterGenerating}
+                      disabled={!aiChapterText.trim() || !selectedChapter}
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold"
+                      icon={<Sparkles size={16} />}
+                    >
+                      {isCurrentChapterGenerating ? 'Generating...' : 'Generate ✨'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Generated Results compact list */}
+              {generatedItems.length > 0 && (
+                <div className="flex flex-col gap-3 animate-fade-in">
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-surface-200 rounded-2xl px-4 py-2.5 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="select-all-ai"
+                        checked={selectedAiItemIds.length === generatedItems.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAiItemIds(generatedItems.map((_, i) => i));
+                          } else {
+                            setSelectedAiItemIds([]);
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      />
+                      <label htmlFor="select-all-ai" className="font-bold text-xs text-surface-800 select-none cursor-pointer">
+                        Select All Generated ({generatedItems.length} items)
+                      </label>
+                    </div>
+
+                    <Button
+                      onClick={handleAiImport}
+                      loading={aiImporting}
+                      disabled={selectedAiItemIds.length === 0 || !selectedChapter}
+                      icon={<Upload size={15} />}
+                      className="font-bold text-xs"
+                    >
+                      Import {selectedAiItemIds.length} Selected to Database 🚀
+                    </Button>
+                  </div>
+
+                  {/* Compact list of generated questions */}
+                  <div className="bg-white border border-surface-200 rounded-2xl divide-y divide-surface-100 overflow-y-auto max-h-[calc(100vh-440px)] min-h-[180px] shadow-2xs">
+                    {generatedItems.map((payload: any, idx: number) => {
+                      const isSelected = selectedAiItemIds.includes(idx);
+                      const tempContentItem: Content = {
+                        id: `temp-${idx}`,
+                        chapter_id: selectedChapter,
+                        activity_type: aiActivityType,
+                        payload,
+                        created_by: profile?.id || '',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      };
+                      const previewText = getPayloadPreview(tempContentItem);
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center gap-2.5 px-3.5 py-2 text-xs transition-colors hover:bg-surface-50 ${
+                            isSelected ? 'bg-primary-50/40' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedAiItemIds((prev) =>
+                                prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0"
+                          />
+
+                          <span className="text-[11px] font-bold text-surface-400 w-6 shrink-0 text-right">
+                            #{idx + 1}
+                          </span>
+
+                          <span className="shrink-0">
+                            <Badge variant="info" size="sm" className="text-[10px] px-2 py-0.5">
+                              {aiActivityType}
+                            </Badge>
+                          </span>
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-surface-800 line-clamp-2 text-xs leading-relaxed" title={previewText}>
+                              {previewText}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => {
+                                setEditingContent(tempContentItem);
+                                setPayloadText(JSON.stringify(payload, null, 2));
+                                setShowModal(true);
+                              }}
+                              className="p-1 hover:bg-surface-100 text-surface-600 hover:text-surface-900 rounded cursor-pointer transition-colors"
+                              title="Edit Payload"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setGeneratedItems((prev) => prev.filter((_, i) => i !== idx));
+                                setSelectedAiItemIds((prev) => prev.filter((i) => i !== idx));
+                              }}
+                              className="p-1 hover:bg-danger-50 text-danger-500 rounded cursor-pointer transition-colors"
+                              title="Remove Item"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

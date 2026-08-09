@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { supabase } from '../lib/supabase';
+import { toast } from '../components/ui/Toast';
 import {
   Home,
   BookOpen,
@@ -19,6 +20,59 @@ import {
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 
+function playNotificationChime() {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {
+    // Ignore audio context errors
+  }
+}
+
+function sendDeviceNotification(title: string, body: string, onClickHandler?: () => void) {
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Notification.permission === 'granted') {
+      try {
+        const notif = new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+          tag: 'quizlee-material-' + Date.now(),
+        });
+        notif.onclick = () => {
+          window.focus();
+          if (onClickHandler) onClickHandler();
+        };
+      } catch (err) {
+        console.error('Device notification failed:', err);
+      }
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate([200, 100, 200]);
+    } catch {}
+  }
+}
+
 export default function StudentLayout() {
   const { profile } = useAuthStore();
   const navigate = useNavigate();
@@ -26,25 +80,187 @@ export default function StudentLayout() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [hasConnectedTeacher, setHasConnectedTeacher] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+
+  // Request browser notification permission once on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  // Fetch pending count for connected teachers
+  const fetchPendingCount = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const { data: relations } = await supabase
+        .from('student_teacher_relations')
+        .select('teacher_id')
+        .eq('student_id', profile.id)
+        .eq('status', 'approved');
+
+      if (!relations || relations.length === 0) {
+        setHasConnectedTeacher(false);
+        setPendingCount(0);
+        return;
+      }
+
+      setHasConnectedTeacher(true);
+      const teacherIds = relations.map((r) => r.teacher_id);
+
+      const { data: sharesData } = await supabase
+        .from('teacher_shares')
+        .select('id, student_ids')
+        .in('teacher_id', teacherIds);
+
+      if (!sharesData || sharesData.length === 0) {
+        setPendingCount(0);
+        return;
+      }
+
+      const relevantShares = sharesData.filter((s) => {
+        if (!s.student_ids || !Array.isArray(s.student_ids) || s.student_ids.length === 0) {
+          return true;
+        }
+        return s.student_ids.includes(profile.id);
+      });
+
+      if (relevantShares.length === 0) {
+        setPendingCount(0);
+        return;
+      }
+
+      const shareIds = relevantShares.map((s) => s.id);
+
+      const { data: subsData } = await supabase
+        .from('student_share_submissions')
+        .select('share_id')
+        .eq('student_id', profile.id)
+        .in('share_id', shareIds);
+
+      const completedShareIds = new Set((subsData || []).map((s) => s.share_id));
+      const pending = relevantShares.filter((s) => !completedShareIds.has(s.id)).length;
+      setPendingCount(pending);
+    } catch (err) {
+      console.error('Error calculating pending classroom materials:', err);
+    }
+  }, [profile?.id]);
 
   useEffect(() => {
-    async function checkTeacherConnection() {
-      if (!profile?.id) return;
-      const { data } = await supabase
-        .from('student_teacher_relations')
-        .select('id')
-        .eq('student_id', profile.id)
-        .eq('status', 'approved')
-        .limit(1);
+    fetchPendingCount();
+  }, [fetchPendingCount]);
 
-      if (data && data.length > 0) {
-        setHasConnectedTeacher(true);
-      } else {
-        setHasConnectedTeacher(false);
+  // Listen for realtime changes, BroadcastChannel, storage & custom event updates
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const handleCustomUpdate = () => {
+      fetchPendingCount();
+    };
+
+    // Custom window event listener
+    window.addEventListener('classroom_activity_updated', handleCustomUpdate);
+
+    // Cross-tab storage listener
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'quizlee_classroom_sync') {
+        fetchPendingCount();
       }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cross-tab BroadcastChannel listener
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('quizlee_classroom_updates');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'MATERIAL_SHARED' || event.data?.type === 'SUBMISSION_UPDATED') {
+          fetchPendingCount();
+        }
+      };
+    } catch {
+      // BroadcastChannel fallback
     }
-    checkTeacherConnection();
-  }, [profile?.id]);
+
+    // 5-second heartbeat poll fallback
+    const intervalId = setInterval(() => {
+      fetchPendingCount();
+    }, 5000);
+
+    // Subscribe to teacher_shares INSERT and DELETE
+    const sharesChannel = supabase
+      .channel('student-layout-shares-v2')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teacher_shares',
+        },
+        async (payload) => {
+          fetchPendingCount();
+
+          if (payload.eventType === 'INSERT') {
+            const newShare = payload.new as any;
+            if (newShare?.student_ids && Array.isArray(newShare.student_ids) && newShare.student_ids.length > 0) {
+              if (!newShare.student_ids.includes(profile.id)) return;
+            }
+
+            let teacherName = 'Your teacher';
+            if (newShare?.teacher_id) {
+              const { data: tProf } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', newShare.teacher_id)
+                .maybeSingle();
+              if (tProf?.full_name) {
+                teacherName = tProf.full_name;
+              }
+            }
+
+            const shareTitle = newShare?.title || 'New Material';
+            sendDeviceNotification(
+              '📚 New Classroom Material!',
+              `${teacherName} shared: ${shareTitle}`,
+              () => navigate('/student/class-activities')
+            );
+            toast(`📚 New material shared by ${teacherName}: ${shareTitle}`, 'info');
+            playNotificationChime();
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to student_share_submissions changes
+    const subsChannel = supabase
+      .channel('student-layout-submissions-v2')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_share_submissions',
+          filter: `student_id=eq.${profile.id}`,
+        },
+        () => {
+          fetchPendingCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('classroom_activity_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      clearInterval(intervalId);
+      supabase.removeChannel(sharesChannel);
+      supabase.removeChannel(subsChannel);
+    };
+  }, [profile?.id, fetchPendingCount, navigate]);
 
   const dynamicNavItems = [
     { to: '/student', icon: Home, label: 'Home', end: true },
@@ -165,10 +381,15 @@ export default function StudentLayout() {
               {hasConnectedTeacher && (
                 <button 
                   onClick={() => navigate('/student/class-activities')}
-                  className="p-1.5 sm:p-2 rounded-full hover:bg-white/50 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0"
-                  title="Classroom Activities"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-surface-100 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0 relative"
+                  title={`Classroom Activities${pendingCount > 0 ? ` (${pendingCount} pending)` : ''}`}
                 >
                   <GraduationCap size={18} className="sm:w-5 sm:h-5" />
+                  {pendingCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4.5 min-w-[18px] sm:h-5 sm:min-w-[20px] items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-rose-600 px-1 text-[10px] sm:text-xs font-black text-white ring-2 ring-white animate-pulse shadow-md">
+                      {pendingCount > 99 ? '99+' : pendingCount}
+                    </span>
+                  )}
                 </button>
               )}
 
@@ -273,34 +494,40 @@ export default function StudentLayout() {
       )}
 
       {/* Main Content Area */}
-      <main className={isPlayPage ? "relative z-10 min-h-screen flex flex-col" : "relative z-10 max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop pt-8 pb-32"}>
+      <main className={isPlayPage ? "relative z-10 min-h-screen flex flex-col" : "relative z-10 max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop pt-8 pb-36"}>
         <Outlet />
       </main>
 
       {/* Mobile Bottom Navigation */}
       {!isPlayPage && (
-        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 lg:hidden bg-white/95 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.06)] border-t border-white/40 gpu-layer">
-          {dynamicNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center px-4 py-2.5 transition-all duration-300 ${
-                  isActive
-                    ? 'bg-gradient-to-br from-primary to-indigo-600 text-white rounded-2xl scale-105 shadow-md shadow-primary/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high rounded-2xl'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={20} className={isActive ? 'stroke-[2.5px]' : ''} />
-                  <span className="font-label-md text-[10px] font-bold mt-0.5">{item.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
+        <nav className="fixed bottom-0 left-0 right-0 z-[60] lg:hidden bg-white/95 backdrop-blur-xl border-t border-surface-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-4 pt-2.5 pb-safe pb-3 sm:pb-4 gpu-layer">
+          <div className="max-w-md mx-auto flex items-center justify-around gap-1">
+            {dynamicNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center justify-center transition-all duration-300 ease-out cursor-pointer ${
+                    isActive
+                      ? 'px-3.5 py-2 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 text-white shadow-md shadow-primary/25 scale-105'
+                      : 'p-2.5 rounded-2xl text-surface-500 hover:text-primary hover:bg-surface-100/70'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon size={20} className={isActive ? 'stroke-[2.5px] shrink-0' : 'stroke-[2px] shrink-0'} />
+                    {isActive && (
+                      <span className="text-xs font-extrabold ml-1.5 whitespace-nowrap animate-fade-in tracking-tight">
+                        {item.label}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         </nav>
       )}
     </div>

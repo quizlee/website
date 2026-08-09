@@ -12,19 +12,93 @@ import {
   Link as LinkIcon,
   Play,
   ExternalLink,
-  Clipboard,
   Calendar,
   User,
   CheckCircle2,
-  AlertCircle
+  Clock,
+  Check,
+  RotateCcw,
+  Layers,
+  FileEdit,
+  Monitor,
+  Gamepad2,
 } from 'lucide-react';
+
+const ACTIVITY_MAP: Record<string, { label: string; emoji: string }> = {
+  quiz: { label: 'Quiz Quest', emoji: '⚡' },
+  flashcard: { label: 'Flash Flip', emoji: '🔄' },
+  matching: { label: 'Match Mania', emoji: '🧩' },
+  picture: { label: 'Pic Picasso', emoji: '🖼️' },
+  dragndrop: { label: 'Drag & Drop', emoji: '📥' },
+};
+
+function getShareXp(share: { description?: string | null }): number {
+  if (share.description) {
+    try {
+      const parsed = JSON.parse(share.description);
+      if (parsed.xp !== undefined) return Number(parsed.xp) || 50;
+    } catch {
+      if (share.description.startsWith('XP:')) return Number(share.description.replace('XP:', '')) || 50;
+    }
+  }
+  return 50;
+}
+
+function getActivityXp(share: { description?: string | null; url?: string | null }): number {
+  let xpPerItemVal = 10;
+  if (share.description) {
+    try {
+      const parsed = JSON.parse(share.description);
+      if (parsed.xp_per_item !== undefined) xpPerItemVal = Number(parsed.xp_per_item) || 10;
+    } catch {
+      // fallback
+    }
+  }
+  let itemCount = 10;
+  if (share.url?.startsWith('content_ids:')) {
+    itemCount = share.url.replace('content_ids:', '').split(',').filter(Boolean).length || 1;
+  }
+  return itemCount * xpPerItemVal;
+}
+
+function getEarnedActivityXp(
+  share: { description?: string | null; url?: string | null },
+  submission?: { score?: number | null } | null
+): number {
+  let xpPerItemVal = 10;
+  if (share.description) {
+    try {
+      const parsed = JSON.parse(share.description);
+      if (parsed.xp_per_item !== undefined) xpPerItemVal = Number(parsed.xp_per_item) || 10;
+    } catch {
+      // fallback
+    }
+  }
+  let itemCount = 10;
+  if (share.url?.startsWith('content_ids:')) {
+    itemCount = share.url.replace('content_ids:', '').split(',').filter(Boolean).length || 1;
+  }
+  const totalActivityXp = itemCount * xpPerItemVal;
+
+  if (submission && submission.score !== null && submission.score !== undefined) {
+    let scorePct = 100;
+    if (submission.score <= itemCount && itemCount > 0) {
+      scorePct = Math.round((submission.score / itemCount) * 100);
+    } else {
+      scorePct = Math.min(100, Math.max(0, submission.score));
+    }
+    return Math.round((totalActivityXp * scorePct) / 100);
+  }
+
+  return totalActivityXp;
+}
 
 interface Share {
   id: string;
   teacher_id: string;
   title: string;
   description: string | null;
-  type: 'activity' | 'document' | 'link';
+  type: 'activity' | 'document' | 'copywork' | 'practical' | 'link';
   url: string | null;
   class_id: string | null;
   subject_id: string | null;
@@ -40,10 +114,12 @@ interface Share {
 interface Submission {
   id: string;
   share_id: string;
+  student_id: string;
   status: 'completed' | 'submitted';
   submission_content: string | null;
   score: number | null;
   completed_at: string;
+  student?: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
 }
 
 export default function ClassActivitiesPage() {
@@ -52,18 +128,92 @@ export default function ClassActivitiesPage() {
   const [loading, setLoading] = useState(true);
   const [shares, setShares] = useState<Share[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, Submission>>({});
+  const [allSubmissionsMap, setAllSubmissionsMap] = useState<Record<string, Submission[]>>({});
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
-  const [responseTexts, setResponseTexts] = useState<Record<string, string>>({});
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [chaptersMap, setChaptersMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchClassActivities();
+
+    const handleCustomUpdate = () => {
+      fetchClassActivities();
+    };
+    window.addEventListener('classroom_activity_updated', handleCustomUpdate);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'quizlee_classroom_sync') {
+        fetchClassActivities();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('quizlee_classroom_updates');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'MATERIAL_SHARED' || event.data?.type === 'SUBMISSION_UPDATED') {
+          fetchClassActivities();
+        }
+      };
+    } catch {}
+
+    const sharesChannel = supabase
+      .channel('student-class-activities-shares-live')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teacher_shares',
+        },
+        () => {
+          fetchClassActivities();
+        }
+      )
+      .subscribe();
+
+    const subChannel = supabase
+      .channel('student-class-activities-submissions-live')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_share_submissions',
+          filter: profile?.id ? `student_id=eq.${profile.id}` : undefined,
+        },
+        () => {
+          fetchClassActivities();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('classroom_activity_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      supabase.removeChannel(sharesChannel);
+      supabase.removeChannel(subChannel);
+    };
   }, [profile?.id]);
 
   async function fetchClassActivities() {
     if (!profile?.id) return;
     setLoading(true);
     try {
+      // 0. Fetch chapters for multi-chapter name resolving
+      const { data: allChData } = await supabase.from('chapters').select('id, name');
+      if (allChData) {
+        const cMap: Record<string, string> = {};
+        allChData.forEach((c) => { cMap[c.id] = c.name; });
+        setChaptersMap(cMap);
+      }
+
       // 1. Fetch connected teachers
       const { data: relations, error: relError } = await supabase
         .from('student_teacher_relations')
@@ -96,23 +246,48 @@ export default function ClassActivitiesPage() {
 
       if (sharesError) throw sharesError;
 
-      // 3. Fetch submissions
-      const { data: subsData, error: subsError } = await supabase
-        .from('student_share_submissions')
-        .select('*')
-        .eq('student_id', profile.id);
-
-      if (subsError) throw subsError;
-
+      // 3. Fetch submissions for all shares
+      const allShares = (sharesData as Share[]) || [];
+      const shareIds = allShares.map((s) => s.id);
       const subMap: Record<string, Submission> = {};
-      if (subsData) {
-        subsData.forEach((sub: Submission) => {
-          subMap[sub.share_id] = sub;
-        });
+      const shareSubMap: Record<string, Submission[]> = {};
+
+      if (shareIds.length > 0) {
+        const { data: subsData, error: subsError } = await supabase
+          .from('student_share_submissions')
+          .select(`
+            *,
+            student:profiles!student_share_submissions_student_id_fkey(full_name, username, avatar_url)
+          `)
+          .in('share_id', shareIds);
+
+        if (subsError) {
+          console.error('Error loading submissions:', subsError);
+        } else if (subsData) {
+          subsData.forEach((sub: Submission) => {
+            if (sub.student_id === profile.id) {
+              subMap[sub.share_id] = sub;
+            }
+            if (!shareSubMap[sub.share_id]) {
+              shareSubMap[sub.share_id] = [];
+            }
+            shareSubMap[sub.share_id].push(sub);
+          });
+        }
       }
 
-      setShares((sharesData as Share[]) || []);
+      const hasPending = allShares.some((s) => !subMap[s.id]);
+      if (hasPending) {
+        setActiveTab('pending');
+      } else if (allShares.length > 0) {
+        setActiveTab('completed');
+      } else {
+        setActiveTab('pending');
+      }
+
+      setShares(allShares);
       setSubmissions(subMap);
+      setAllSubmissionsMap(shareSubMap);
     } catch (error: any) {
       console.error('Error loading class activities:', error);
       toast(error.message, 'error');
@@ -121,42 +296,81 @@ export default function ClassActivitiesPage() {
     }
   }
 
-  async function handleDocLinkSubmit(shareId: string) {
-    const text = responseTexts[shareId]?.trim();
-    if (!text) {
-      toast('Please write a brief response before submitting.', 'info');
+  async function toggleMarkComplete(shareId: string) {
+    if (!profile?.id) return;
+    const currentSub = submissions[shareId];
+
+    if (currentSub?.status === 'verified') {
+      toast('Verified materials cannot be undone.', 'warning');
       return;
     }
 
-    setSubmittingId(shareId);
+    setTogglingId(shareId);
+
     try {
-      const { data, error } = await supabase
-        .from('student_share_submissions')
-        .upsert(
-          {
-            share_id: shareId,
-            student_id: profile!.id,
-            status: 'submitted',
-            submission_content: text,
-            completed_at: new Date().toISOString(),
-          },
-          { onConflict: 'share_id,student_id' }
-        )
-        .select()
-        .single();
+      if (currentSub) {
+        // Delete submission (mark as pending)
+        const { error } = await supabase
+          .from('student_share_submissions')
+          .delete()
+          .eq('id', currentSub.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast('Task submitted successfully! 🎉', 'success');
-      setSubmissions((prev) => ({ ...prev, [shareId]: data as Submission }));
-      setResponseTexts((prev) => ({ ...prev, [shareId]: '' }));
+        setSubmissions((prev) => {
+          const next = { ...prev };
+          delete next[shareId];
+          return next;
+        });
+        setAllSubmissionsMap((prev) => {
+          const next = { ...prev };
+          if (next[shareId]) {
+            next[shareId] = next[shareId].filter((s) => s.student_id !== profile.id);
+          }
+          return next;
+        });
+        toast('Marked as pending', 'info');
+      } else {
+        // Create submission (mark as completed)
+        const { data, error } = await supabase
+          .from('student_share_submissions')
+          .upsert(
+            {
+              share_id: shareId,
+              student_id: profile.id,
+              status: 'completed',
+              submission_content: 'Marked complete',
+              completed_at: new Date().toISOString(),
+            },
+            { onConflict: 'share_id,student_id' }
+          )
+          .select(`
+            *,
+            student:profiles!student_share_submissions_student_id_fkey(full_name, username, avatar_url)
+          `)
+          .single();
+
+        if (error) throw error;
+
+        const newSub = data as Submission;
+        setSubmissions((prev) => ({ ...prev, [shareId]: newSub }));
+        setAllSubmissionsMap((prev) => ({
+          ...prev,
+          [shareId]: [...(prev[shareId] || []).filter((s) => s.student_id !== profile.id), newSub],
+        }));
+        toast('Marked as complete! 🎉', 'success');
+      }
+      window.dispatchEvent(new Event('classroom_activity_updated'));
     } catch (error: any) {
-      console.error('Submission error:', error);
+      console.error('Error updating status:', error);
       toast(error.message, 'error');
     } finally {
-      setSubmittingId(null);
+      setTogglingId(null);
     }
   }
+
+  const pendingCount = shares.filter((s) => !submissions[s.id]).length;
+  const completedCount = shares.filter((s) => !!submissions[s.id]).length;
 
   const filteredShares = shares.filter((share) => {
     const isCompleted = !!submissions[share.id];
@@ -167,273 +381,407 @@ export default function ClassActivitiesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-24">
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
         <Spinner size="lg" />
+        <p className="text-sm font-semibold text-surface-400 animate-pulse">Loading classroom materials...</p>
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-surface-900 flex items-center gap-2.5">
+    <div className="animate-fade-in max-w-6xl mx-auto space-y-6 pb-12">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-200/60 pb-4">
+        <div className="hidden sm:block">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 flex items-center gap-2">
             Classroom 🏫
           </h1>
-          <p className="text-surface-500 mt-1">
+          <p className="text-surface-500 text-xs sm:text-sm mt-0.5">
             Complete tasks, view materials, and play activities assigned by your teacher.
           </p>
         </div>
 
-        {/* Tab Filters */}
-        <div className="flex bg-surface-100 p-1.5 rounded-2xl border border-surface-200 shadow-sm shrink-0 self-start sm:self-center">
-          {(['all', 'pending', 'completed'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`
-                px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all duration-200 cursor-pointer
-                ${
-                  activeTab === tab
-                    ? 'bg-white text-primary shadow-md scale-102'
-                    : 'text-surface-500 hover:text-surface-800'
-                }
-              `}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* Control Bar: Filter Tabs */}
+        <div className="flex items-center bg-surface-100 p-1 rounded-2xl border border-surface-200/80 shadow-inner self-start sm:self-auto">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'all'
+                ? 'bg-white text-surface-900 shadow-sm'
+                : 'text-surface-500 hover:text-surface-800'
+            }`}
+          >
+            <span>All</span>
+            <span className="bg-surface-200 text-surface-700 px-2 py-0.5 rounded-full text-[11px]">
+              {shares.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'pending'
+                ? 'bg-white text-amber-600 shadow-sm'
+                : 'text-surface-500 hover:text-surface-800'
+            }`}
+          >
+            <span>Pending</span>
+            {pendingCount > 0 && (
+              <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[11px]">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'completed'
+                ? 'bg-white text-emerald-600 shadow-sm'
+                : 'text-surface-500 hover:text-surface-800'
+            }`}
+          >
+            <span>Completed</span>
+            {completedCount > 0 && (
+              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[11px]">
+                {completedCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* Material Cards Grid */}
       {filteredShares.length === 0 ? (
-        <Card className="text-center py-16">
-          <div className="text-5xl mb-4">
+        <Card className="text-center py-16 px-4 rounded-3xl border-dashed border-2 border-surface-200">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-100 flex items-center justify-center text-3xl">
             {activeTab === 'completed' ? '🏆' : activeTab === 'pending' ? '🎉' : '📭'}
           </div>
           <h3 className="text-lg font-bold text-surface-800">
             {activeTab === 'completed'
-              ? 'No completed tasks yet!'
+              ? 'No completed activities yet!'
               : activeTab === 'pending'
               ? 'All caught up! No pending tasks.'
-              : 'No classroom materials yet!'}
+              : 'No classroom materials shared yet.'}
           </h3>
           <p className="text-sm text-surface-500 mt-2 max-w-sm mx-auto">
             {activeTab === 'completed'
-              ? "Complete activities or submit documents assigned by your teacher to see them here."
+              ? 'Complete assigned activities or documents to track your progress here.'
               : activeTab === 'pending'
-              ? "Great job! Keep checking back for new materials shared by your teacher."
-              : "Ask your teacher to share documents, links, or play activities with you!"}
+              ? 'Awesome job! Check back later for new materials shared by your teacher.'
+              : 'Your teachers will post documents, links, and activities here.'}
           </p>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredShares.map((share) => {
             const submission = submissions[share.id];
             const isCompleted = !!submission;
             const formattedDate = new Date(share.created_at).toLocaleDateString(undefined, {
               month: 'short',
               day: 'numeric',
-              year: 'numeric',
             });
 
-            // Activity type display details
             const isActivity = share.type === 'activity';
-            const iconMap = {
-              activity: BookOpen,
-              document: FileText,
-              link: LinkIcon,
-            };
-            const Icon = iconMap[share.type];
+            const isDoc = share.type === 'document';
+            const isPractical = share.type === 'practical';
 
-            const badgeBgColor = {
-              activity: 'bg-primary-50 text-primary border-primary-200',
-              document: 'bg-secondary-50 text-secondary-700 border-secondary-200',
-              link: 'bg-accent-50 text-accent-700 border-accent-200',
-            }[share.type];
+            // Theme configurations
+            const cardTheme = isActivity
+              ? {
+                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-indigo-100 hover:border-indigo-300 bg-gradient-to-br from-white to-indigo-50/30',
+                  badge: 'text-indigo-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-primary-600 via-indigo-600 to-primary-700 hover:from-primary-700 hover:to-indigo-800 text-white shadow-sm hover:shadow-md',
+                  label: 'Activity',
+                  icon: Gamepad2,
+                }
+              : isDoc
+              ? {
+                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-emerald-100 hover:border-emerald-300 bg-gradient-to-br from-white to-emerald-50/30',
+                  badge: 'text-emerald-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-sm hover:shadow-md',
+                  label: 'Document',
+                  icon: FileText,
+                }
+              : isPractical
+              ? {
+                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-emerald-100 hover:border-emerald-300 bg-gradient-to-br from-white to-emerald-50/30',
+                  badge: 'text-emerald-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-sm hover:shadow-md',
+                  label: 'Practical',
+                  icon: Monitor,
+                }
+              : {
+                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-amber-100 hover:border-amber-300 bg-gradient-to-br from-white to-amber-50/30',
+                  badge: 'text-amber-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-sm hover:shadow-md',
+                  label: 'Copywork',
+                  icon: FileEdit,
+                };
+
+            const IconComponent = cardTheme.icon;
+            const shareSubmissions = allSubmissionsMap[share.id] || [];
 
             return (
-              <Card
+              <div
                 key={share.id}
                 className={`
-                  border-2 transition-all duration-300 relative overflow-hidden
-                  ${
-                    isCompleted
-                      ? 'border-green-100 hover:border-green-200 bg-white'
-                      : 'border-surface-100 hover:border-primary-100 hover:shadow-md bg-white'
-                  }
+                  group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl p-4 sm:p-5 border-2 transition-all duration-200 shadow-sm hover:shadow-md
+                  ${cardTheme.border}
                 `}
               >
-                {isCompleted && (
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-green-500" />
-                )}
-
-                <div className="p-6">
-                  {/* Top info row */}
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-bold uppercase tracking-wide border px-2.5 py-1 rounded-full flex items-center gap-1.5 ${badgeBgColor}`}
-                      >
-                        <Icon size={12} />
-                        {share.type}
-                      </span>
-                      {isActivity && share.activity_type && (
-                        <span className="text-xs font-bold bg-slate-50 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full capitalize">
-                          {share.activity_type}
+                <div>
+                  {/* Card Header Row */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <div className={`p-1.5 sm:p-2 rounded-xl ${cardTheme.iconBg} shadow-sm shrink-0`}>
+                        <IconComponent size={15} />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <span className={`text-[10px] sm:text-[11px] uppercase tracking-wider ${cardTheme.badge} shrink-0`}>
+                          {cardTheme.label}
                         </span>
-                      )}
+                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-surface-400 shrink-0">
+                          <Calendar size={12} />
+                          <span>{formattedDate}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-semibold text-surface-400">
-                      <span className="flex items-center gap-1">
-                        <User size={14} />
-                        {share.teacher?.full_name || 'Teacher'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar size={14} />
-                        {formattedDate}
-                      </span>
+
+                    {/* Top Right Corner: Undo button when completed, XP tag when pending */}
+                    <div className="shrink-0 ml-auto">
+                      {isCompleted ? (
+                        !isActivity && submission?.status !== 'verified' && (
+                          <button
+                            type="button"
+                            onClick={() => toggleMarkComplete(share.id)}
+                            disabled={togglingId === share.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold text-surface-600 hover:text-surface-900 bg-surface-100 hover:bg-surface-200 border border-surface-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                            title="Mark as pending"
+                          >
+                            <RotateCcw size={11} className="shrink-0 text-surface-500" />
+                            <span>Undo</span>
+                          </button>
+                        )
+                      ) : (
+                        <>
+                          {!isActivity && (
+                            <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 shrink-0">
+                              ⭐ +{getShareXp(share)} XP
+                            </span>
+                          )}
+                          {isActivity && (() => {
+                            let xpPerItemVal = 10;
+                            if (share.description) {
+                              try {
+                                const parsed = JSON.parse(share.description);
+                                if (parsed.xp_per_item !== undefined) xpPerItemVal = Number(parsed.xp_per_item) || 10;
+                              } catch {
+                                // fallback
+                              }
+                            }
+                            let itemCount = 10;
+                            if (share.url?.startsWith('content_ids:')) {
+                              itemCount = share.url.replace('content_ids:', '').split(',').filter(Boolean).length || 1;
+                            }
+                            const totalXp = itemCount * xpPerItemVal;
+                            return (
+                              <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 shrink-0">
+                                ⭐ +{totalXp} XP
+                              </span>
+                            );
+                          })()}
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Title & Description */}
-                  <h2 className="text-xl font-bold text-surface-900 mb-2 leading-snug">{share.title}</h2>
-                  {share.description && (
-                    <p className="text-sm text-surface-500 mb-4 whitespace-pre-wrap">{share.description}</p>
-                  )}
+                  {/* Title Heading */}
+                  <h3 className="text-sm sm:text-base font-extrabold text-surface-900 group-hover:text-primary transition-colors leading-snug line-clamp-2 mb-3 break-words">
+                    {share.title}
+                  </h3>
 
-                  {/* Activity Details / Material Actions */}
-                  {isActivity && (
-                    <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl mb-5 text-sm">
-                      <p className="text-xs text-surface-400 uppercase font-black tracking-wide mb-2">
-                        Target Chapters
-                      </p>
-                      <p className="font-extrabold text-surface-850">
-                        {share.class?.name || 'Class'} &bull; {share.subject?.name || 'Subject'}
-                      </p>
-                      <p className="text-surface-600 font-semibold mt-1">
-                        📂 Chapter: {share.chapter?.name || 'Chapter'}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Action Section */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-surface-50">
-                    <div className="flex flex-col gap-1.5">
-                      {isCompleted ? (
-                        <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
-                          <CheckCircle2 size={18} className="text-green-500 fill-green-50" />
-                          <span>Task Completed!</span>
-                          {submission.score !== null && (
-                            <span className="bg-green-50 text-green-700 px-2 py-0.5 border border-green-200 rounded-md text-xs font-black ml-1.5">
-                              Score: {submission.score}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-warning-700 font-bold text-sm">
-                          <AlertCircle size={18} className="text-warning-500" />
-                          <span>Task Pending</span>
-                        </div>
-                      )}
-                      {isCompleted && (
-                        <p className="text-[11px] text-surface-400 font-medium">
-                          Completed on {new Date(submission.completed_at).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="shrink-0 flex items-center gap-3">
-                      {/* Play Activity Button */}
-                      {isActivity && share.chapter_id && share.activity_type && (
+                  {/* Action Buttons (Hidden when completed) */}
+                  {!isCompleted && (
+                    <div className="mb-3 sm:mb-4">
+                      {isActivity && (share.chapter_id || share.url?.startsWith('content_ids:')) && share.activity_type && (
                         <Button
+                          size="md"
                           onClick={() => {
                             const params = new URLSearchParams();
-                            params.append('chapters', share.chapter_id!);
+                            let chIds: string[] = [];
+                            if (share.description) {
+                              try {
+                                const parsed = JSON.parse(share.description);
+                                if (Array.isArray(parsed.chapter_ids) && parsed.chapter_ids.length > 0) {
+                                  chIds = parsed.chapter_ids;
+                                }
+                              } catch {}
+                            }
+                            if (chIds.length > 0) {
+                              chIds.forEach((id) => params.append('chapters', id));
+                            } else if (share.chapter_id) {
+                              params.append('chapters', share.chapter_id);
+                            }
                             params.set('type', share.activity_type!);
                             params.set('mode', 'practice');
                             params.set('share_id', share.id);
+                            if (share.url && share.url.startsWith('content_ids:')) {
+                              params.set('content_ids', share.url.replace('content_ids:', ''));
+                            }
                             params.set('from', '/student/class-activities');
                             navigate(`/student/play?${params.toString()}`);
                           }}
-                          icon={isCompleted ? <Play size={16} /> : <Play size={16} />}
-                          variant={isCompleted ? 'outline' : 'primary'}
-                          className="w-full sm:w-auto"
+                          icon={<Play size={14} className="fill-current shrink-0" />}
+                          className={`w-fit px-4 sm:px-5 py-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${cardTheme.buttonBg}`}
                         >
-                          {isCompleted ? 'Play Again 🎮' : 'Play Activity 🎮'}
+                          ⚡ Start
                         </Button>
                       )}
 
-                      {/* Open Link / Document Button */}
-                      {(share.type === 'document' || share.type === 'link') && share.url && (
-                        <a
-                          href={share.url.startsWith('http') ? share.url : `https://${share.url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full sm:w-auto"
-                        >
-                          <Button
-                            variant="outline"
-                            icon={<ExternalLink size={16} />}
-                            className="w-full"
-                          >
-                            Open {share.type === 'document' ? 'Document' : 'Link'}
-                          </Button>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Submission Form (for Documents & Links) */}
-                  {(share.type === 'document' || share.type === 'link') && (
-                    <div className="mt-5 pt-5 border-t border-dashed border-surface-100">
-                      {isCompleted ? (
-                        <div className="bg-green-50/40 border border-green-100 p-4 rounded-xl">
-                          <p className="text-xs text-green-800 font-black uppercase tracking-wider mb-1">
-                            Your Submission
-                          </p>
-                          <p className="text-sm text-surface-700 italic">
-                            "{submission.submission_content}"
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <label className="block text-xs font-bold text-surface-500 uppercase tracking-wide">
-                            Write response / Paste completed link:
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={responseTexts[share.id] || ''}
-                            onChange={(e) =>
-                              setResponseTexts((prev) => ({
-                                ...prev,
-                                [share.id]: e.target.value,
-                              }))
-                            }
-                            placeholder={
-                              share.type === 'document'
-                                ? 'e.g. Completed the worksheet! (Or paste your homework link)'
-                                : 'e.g. Finished reading, very interesting!'
-                            }
-                            className="w-full px-4 py-2.5 text-sm rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none bg-surface-50/50"
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              onClick={() => handleDocLinkSubmit(share.id)}
-                              loading={submittingId === share.id}
-                              variant="primary"
-                              size="sm"
-                              icon={<Clipboard size={14} />}
+                      {!isActivity && (
+                        <div className="flex items-center gap-2">
+                          {share.url && (
+                            <a
+                              href={share.url.startsWith('http') ? share.url : `https://${share.url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
-                              Submit Task
-                            </Button>
-                          </div>
+                              <Button
+                                size="md"
+                                icon={<ExternalLink size={14} className="shrink-0" />}
+                                className={`w-fit px-3.5 sm:px-5 py-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${cardTheme.buttonBg}`}
+                              >
+                                Open
+                              </Button>
+                            </a>
+                          )}
+
+                          <Button
+                            size="md"
+                            variant="ghost"
+                            onClick={() => toggleMarkComplete(share.id)}
+                            loading={togglingId === share.id}
+                            icon={<Check size={14} />}
+                            className="w-fit px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold shrink-0 border-0 hover:bg-surface-200/60"
+                            title="Mark as completed"
+                          >
+                            Mark Done
+                          </Button>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-              </Card>
+
+                {/* Footer Row: Status Indicator & Context Pills */}
+                <div className="mt-auto pt-3 border-t border-surface-200/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {isCompleted ? (
+                      <>
+                        {!isActivity ? (
+                          submission?.status === 'verified' ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 font-extrabold text-[11px] sm:text-xs border border-emerald-200 shrink-0">
+                              <CheckCircle2 size={13} className="text-emerald-600 fill-emerald-100 shrink-0" />
+                              <span>Verified (+{getShareXp(share)} XP Earned)</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 font-extrabold text-[11px] sm:text-xs border border-amber-200/80 shrink-0">
+                              <Clock size={13} className="text-amber-600 shrink-0 animate-pulse" />
+                              <span>Pending Verification (+{getShareXp(share)} XP)</span>
+                            </div>
+                          )
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 font-extrabold text-[11px] sm:text-xs border border-emerald-200 shrink-0">
+                            <CheckCircle2 size={13} className="text-emerald-600 fill-emerald-100 shrink-0" />
+                            <span>Completed (+{getEarnedActivityXp(share, submission)} XP Earned)</span>
+                          </div>
+                        )}
+
+                        {/* Other students who submitted */}
+                        {shareSubmissions
+                          .filter((sub) => sub.student_id !== profile?.id)
+                          .map((sub) => {
+                          const firstName = sub.student?.full_name?.trim().split(' ')[0] || sub.student?.username || 'Student';
+                          return (
+                            <div
+                              key={sub.id}
+                              className="inline-flex items-center gap-1 bg-white border border-emerald-200/80 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold text-surface-800 shadow-2xs shrink-0"
+                              title={`${sub.student?.full_name || 'Student'} completed`}
+                            >
+                              <Check size={11} className="text-emerald-600 stroke-[3] shrink-0" />
+                              {sub.student?.avatar_url ? (
+                                <img
+                                  src={sub.student.avatar_url}
+                                  alt={firstName}
+                                  className="w-3.5 h-3.5 rounded-full object-cover shrink-0"
+                                />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-800 text-[8px] font-extrabold flex items-center justify-center shrink-0">
+                                  {firstName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="truncate max-w-[70px]">{firstName}</span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100/80 text-amber-800 font-bold text-[11px] sm:text-xs shrink-0">
+                        <Clock size={12} className="text-amber-600 shrink-0" />
+                        <span>Pending</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Context Pills (Course info) */}
+                  <div className="flex flex-wrap items-center gap-1.5 max-w-full">
+                    {(() => {
+                      let chIds: string[] = [];
+                      if (share.description) {
+                        try {
+                          const parsed = JSON.parse(share.description);
+                          if (Array.isArray(parsed.chapter_ids) && parsed.chapter_ids.length > 0) {
+                            chIds = parsed.chapter_ids;
+                          }
+                        } catch {}
+                      }
+
+                      const allNames = chIds
+                        .map((id) => chaptersMap[id] || (id === share.chapter_id ? share.chapter?.name : ''))
+                        .filter(Boolean);
+
+                      let chapterText = '';
+                      if (chIds.length > 1) {
+                        chapterText = `${chIds.length} Chapters`;
+                      } else if (allNames.length > 0) {
+                        chapterText = allNames.join(', ');
+                      } else {
+                        chapterText = share.chapter?.name || share.subject?.name || '';
+                      }
+
+                      if (!chapterText) return null;
+
+                      const tooltipText = allNames.length > 0 ? allNames.join(', ') : chapterText;
+
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-surface-100 text-surface-700 font-semibold text-[10px] sm:text-[11px] truncate max-w-[180px] sm:max-w-[260px]"
+                          title={tooltipText}
+                        >
+                          <Layers size={11} className="text-surface-400 shrink-0" />
+                          <span className="truncate">{chapterText}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -441,3 +789,4 @@ export default function ClassActivitiesPage() {
     </div>
   );
 }
+

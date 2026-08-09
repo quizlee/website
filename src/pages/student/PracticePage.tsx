@@ -579,64 +579,83 @@ export default function PracticePage() {
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Test Zone</h3>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
-          {activities.filter(a => a.zone === 'test').map((activity) => {
-            const cardColor = activity.color || '#6366f1';
-            const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
-            return (
-              <div
-                key={activity.key}
-                onClick={() => {
-                  if (activity.is_locked) {
-                    toast(`${activity.label} is locked 🔒`, 'error');
-                    return;
-                  }
-                  if (selectedChapterIds.length === 0) {
-                    toast('Pick at least one chapter above first! 📚', 'error');
-                    return;
-                  }
-                  if (!isContentAvailable) {
-                    toast(`${activity.label} is coming soon! 🚀`, 'info');
-                    return;
-                  }
-                  handleComingSoonClick(activity.label);
-                }}
-                className={`bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border-surface-200 shadow-md relative flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
-              >
-                {activity.is_locked && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-200">
-                      <Lock size={9} /> Locked
-                    </span>
-                  </div>
-                )}
-                {!activity.is_locked && selectedChapterIds.length === 0 && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-sky-200">
-                      📚 Select Chapter
-                    </span>
-                  </div>
-                )}
-                {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                      🚀 Coming Soon
-                    </span>
-                  </div>
-                )}
+        <div className={`relative transition-all duration-300 ${selectedChapterIds.length === 0 ? 'pointer-events-none' : ''}`}>
+          {/* Blur overlay when no chapter selected */}
+          {selectedChapterIds.length === 0 && (
+            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3" style={{ backdropFilter: 'blur(6px)', background: 'rgba(240,244,255,0.60)' }}>
+              <p className="text-sm font-extrabold text-surface-700 text-center px-4">Select a chapter above to unlock</p>
+            </div>
+          )}
+          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-all duration-300 ${selectedChapterIds.length === 0 ? 'blur-[3px] select-none' : ''}`}>
+            {activities.filter(a => a.zone === 'test').map((activity) => {
+              const cardColor = activity.color || '#6366f1';
+              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
+              return (
                 <div
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
-                  style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
+                  key={activity.key}
+                  onClick={() => {
+                    if (activity.is_locked) {
+                      toast(`${activity.label} is locked 🔒`, 'error');
+                      return;
+                    }
+                    if (selectedChapterIds.length === 0) {
+                      toast('Pick at least one chapter above first! 📚', 'error');
+                      return;
+                    }
+                    if (!isContentAvailable) {
+                      toast(`${activity.label} is coming soon! 🚀`, 'info');
+                      return;
+                    }
+                    handleComingSoonClick(activity.label);
+                  }}
+                  className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
+                  style={{
+                    background: '#ffffff',
+                    border: `1.5px solid ${cardColor}50`,
+                    boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
+                  }}
+                  onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}
+                  onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
                 >
-                  {activity.emoji || '📄'}
+                  {/* Glow blob */}
+                  <div
+                    className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
+                    style={{ background: cardColor }}
+                  />
+                  {activity.is_locked && (
+                    <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[3px] flex items-center justify-center p-2 pointer-events-none z-20">
+                      <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
+                        <Lock size={13} className="text-slate-600" /> Locked
+                      </span>
+                    </div>
+                  )}
+                  {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
+                    <div className="absolute inset-0 rounded-3xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+                      <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
+                        🚀 Coming Soon
+                      </span>
+                    </div>
+                  )}
+                  <div
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
+                    style={{
+                      background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
+                      boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
+                    }}
+                  >
+                    {activity.emoji || '📄'}
+                  </div>
+                  <div className="flex-grow min-w-0 relative z-10">
+                    <h4
+                      className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+                      style={{ color: cardColor }}
+                    >{activity.label}</h4>
+                    <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
+                  </div>
                 </div>
-                <div className="flex-grow min-w-0">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
-                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -645,72 +664,92 @@ export default function PracticePage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Play Zone</h3>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter">
-          {activities.filter(a => a.zone === 'play').map((activity) => {
-            const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
-            const cardColor = activity.color || '#6366f1';
-            const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
-            const handleClick = () => {
-              if (activity.is_locked) {
-                toast(`${activity.label} is locked 🔒`, 'error');
-                return;
-              }
-              if (selectedChapterIds.length === 0) {
-                toast('Pick at least one chapter above first! 📚', 'error');
-                return;
-              }
-              if (!isContentAvailable) {
-                toast(`${activity.label} is coming soon! 🚀`, 'info');
-                return;
-              }
-              if (isPlayable) {
-                handleActivityClick(activity.key);
-              } else {
-                handleComingSoonClick(activity.label);
-              }
-            };
-            return (
-              <div
-                key={activity.key}
-                onClick={handleClick}
-                className={`bg-white rounded-2xl p-3 sm:p-5 bouncy cursor-pointer group border-surface-200 shadow-md flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full relative ${activity.is_locked ? 'opacity-70' : 'hover:border-primary/50'}`}
-              >
-                {activity.is_locked && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-200">
-                      <Lock size={9} /> Locked
-                    </span>
-                  </div>
-                )}
-                {!activity.is_locked && selectedChapterIds.length === 0 && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-sky-200">
-                      📚 Select Chapter
-                    </span>
-                  </div>
-                )}
-                {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
-                  <div className="absolute inset-0 rounded-2xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                      🚀 Coming Soon
-                    </span>
-                  </div>
-                )}
+        <div className={`relative transition-all duration-300 ${selectedChapterIds.length === 0 ? 'pointer-events-none' : ''}`}>
+          {/* Blur overlay when no chapter selected */}
+          {selectedChapterIds.length === 0 && (
+            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3" style={{ backdropFilter: 'blur(6px)', background: 'rgba(240,244,255,0.60)' }}>
+              <p className="text-sm font-extrabold text-surface-700 text-center px-4">Select a chapter above to unlock</p>
+            </div>
+          )}
+          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-all duration-300 ${selectedChapterIds.length === 0 ? 'blur-[3px] select-none' : ''}`}>
+            {activities.filter(a => a.zone === 'play').map((activity) => {
+              const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
+              const cardColor = activity.color || '#6366f1';
+              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
+              const handleClick = () => {
+                if (activity.is_locked) {
+                  toast(`${activity.label} is locked 🔒`, 'error');
+                  return;
+                }
+                if (selectedChapterIds.length === 0) {
+                  toast('Pick at least one chapter above first! 📚', 'error');
+                  return;
+                }
+                if (!isContentAvailable) {
+                  toast(`${activity.label} is coming soon! 🚀`, 'info');
+                  return;
+                }
+                if (isPlayable) {
+                  handleActivityClick(activity.key);
+                } else {
+                  handleComingSoonClick(activity.label);
+                }
+              };
+              return (
                 <div
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shrink-0 self-start sm:self-center text-2xl sm:text-3xl drop-shadow-md"
-                  style={{ background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})` }}
+                  key={activity.key}
+                  onClick={handleClick}
+                  className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
+                  style={{
+                    background: '#ffffff',
+                    border: `1.5px solid ${cardColor}50`,
+                    boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
+                  }}
+                  onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}
+                  onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
                 >
-                  {activity.emoji || '🎮'}
+                  {/* Glow blob */}
+                  <div
+                    className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
+                    style={{ background: cardColor }}
+                  />
+                  {activity.is_locked && (
+                    <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[3px] flex items-center justify-center p-2 pointer-events-none z-20">
+                      <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
+                        <Lock size={13} className="text-slate-600" /> Locked
+                      </span>
+                    </div>
+                  )}
+                  {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
+                    <div className="absolute inset-0 rounded-3xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+                      <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
+                        🚀 Coming Soon
+                      </span>
+                    </div>
+                  )}
+                  <div
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
+                    style={{
+                      background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
+                      boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
+                    }}
+                  >
+                    {activity.emoji || '🎮'}
+                  </div>
+                  <div className="flex-grow relative z-10">
+                    <h4
+                      className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+                      style={{ color: cardColor }}
+                    >{activity.label}</h4>
+                    <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
+                  </div>
                 </div>
-                <div className="flex-grow">
-                  <h4 className="font-bold text-on-background group-hover:text-primary-600 transition-colors text-sm sm:text-base md:text-lg">{activity.label}</h4>
-                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
+
 
       {/* Rules & Info */}
       <section className="w-full">
