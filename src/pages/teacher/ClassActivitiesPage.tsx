@@ -10,9 +10,7 @@ import { toast } from '../../components/ui/Toast';
 import {
   Plus,
   Trash2,
-  BookOpen,
   FileText,
-  Link as LinkIcon,
   Users,
   CheckCircle,
   ExternalLink,
@@ -69,7 +67,7 @@ interface Submission {
   id: string;
   share_id: string;
   student_id: string;
-  status: 'completed' | 'submitted';
+  status: 'completed' | 'submitted' | 'verified';
   submission_content: string | null;
   score: number | null;
   completed_at: string;
@@ -449,7 +447,7 @@ export default function TeacherClassActivitiesPage() {
     setVerifyingId(sub.id);
     try {
       // Execute SECURITY DEFINER RPC function to update status & award XP atomically
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_share_submission', {
+      const { error: rpcErr } = await supabase.rpc('verify_share_submission', {
         p_submission_id: sub.id,
         p_xp_amount: xpAmount,
       });
@@ -1233,7 +1231,7 @@ export default function TeacherClassActivitiesPage() {
                               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                             >
                               {verifyingId === sub.id ? (
-                                <Spinner size="xs" />
+                                <Spinner size="sm" />
                               ) : (
                                 <>
                                   <CheckCircle size={14} />
@@ -1636,7 +1634,7 @@ export default function TeacherClassActivitiesPage() {
                                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                                     >
                                       {verifyingId === sub.id ? (
-                                        <Spinner size="xs" />
+                                        <Spinner size="sm" />
                                       ) : (
                                         <>
                                           <CheckCircle size={14} />

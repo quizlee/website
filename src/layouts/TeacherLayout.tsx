@@ -8,7 +8,6 @@ import {
   Upload,
   LogOut,
   User,
-  BookOpen,
 } from 'lucide-react';
 
 const navItems = [

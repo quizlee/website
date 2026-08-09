@@ -182,7 +182,7 @@ export default function App() {
           <Route index element={<TeacherDashboardPage />} />
           <Route path="content" element={<ContentManagerPage />} />
           <Route path="import" element={<BulkImportPage />} />
-          <Route path="class-activities" element={<Navigate to="/teacher" replace />} />
+          <Route path="class-activities" element={<TeacherClassActivitiesPage />} />
           <Route path="account" element={<TeacherAccountPage />} />
         </Route>
 

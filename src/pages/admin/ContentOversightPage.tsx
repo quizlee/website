@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../stores/authStore';
 import type { Content, School, Class, Subject, Chapter, Activity, ActivityType, ContentPayload } from '../../lib/types';
-import { Trash2, Edit, Play, BookOpen, School as SchoolIcon, Plus, Lock, Unlock, Eye, EyeOff, Upload, FileText, CheckCircle2, AlertCircle, ListFilter, ChevronDown, Sparkles } from 'lucide-react';
+import { Trash2, Edit, BookOpen, School as SchoolIcon, Plus, Lock, Unlock, Eye, EyeOff, Upload, FileText, CheckCircle2, AlertCircle, ListFilter, ChevronDown, Sparkles } from 'lucide-react';
 
 interface ValidationError {
   line: number;
@@ -1176,15 +1176,6 @@ ${textSubstrings}`;
     setLoading(false);
   }
 
-  const handlePlayContent = (item: Content) => {
-    const params = new URLSearchParams();
-    params.set('chapters', item.chapter_id);
-    params.set('mode', 'practice');
-    params.set('type', item.activity_type);
-    params.set('count', '10');
-    window.open(`/student/play?${params.toString()}`, '_blank');
-  };
-
   return (
     <div className="animate-fade-in">
       {/* Mobile Toggle Button for Curriculum Explorer */}
@@ -2160,7 +2151,6 @@ ${textSubstrings}`;
                 <div className="bg-white border border-surface-200 rounded-2xl divide-y divide-surface-100 overflow-y-auto max-h-[calc(100vh-440px)] min-h-[180px] shadow-2xs">
                   {contentList.map((item, idx) => {
                     const isSelected = selectedIds.includes(item.id);
-                    const chapterName = chapters.find((c) => c.id === item.chapter_id)?.name;
                     const previewText = getPayloadPreview(item);
 
                     return (

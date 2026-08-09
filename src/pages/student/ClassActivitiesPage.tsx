@@ -7,13 +7,10 @@ import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
 import { toast } from '../../components/ui/Toast';
 import {
-  BookOpen,
   FileText,
-  Link as LinkIcon,
   Play,
   ExternalLink,
   Calendar,
-  User,
   CheckCircle2,
   Clock,
   Check,
@@ -23,14 +20,6 @@ import {
   Monitor,
   Gamepad2,
 } from 'lucide-react';
-
-const ACTIVITY_MAP: Record<string, { label: string; emoji: string }> = {
-  quiz: { label: 'Quiz Quest', emoji: '⚡' },
-  flashcard: { label: 'Flash Flip', emoji: '🔄' },
-  matching: { label: 'Match Mania', emoji: '🧩' },
-  picture: { label: 'Pic Picasso', emoji: '🖼️' },
-  dragndrop: { label: 'Drag & Drop', emoji: '📥' },
-};
 
 function getShareXp(share: { description?: string | null }): number {
   if (share.description) {
@@ -42,23 +31,6 @@ function getShareXp(share: { description?: string | null }): number {
     }
   }
   return 50;
-}
-
-function getActivityXp(share: { description?: string | null; url?: string | null }): number {
-  let xpPerItemVal = 10;
-  if (share.description) {
-    try {
-      const parsed = JSON.parse(share.description);
-      if (parsed.xp_per_item !== undefined) xpPerItemVal = Number(parsed.xp_per_item) || 10;
-    } catch {
-      // fallback
-    }
-  }
-  let itemCount = 10;
-  if (share.url?.startsWith('content_ids:')) {
-    itemCount = share.url.replace('content_ids:', '').split(',').filter(Boolean).length || 1;
-  }
-  return itemCount * xpPerItemVal;
 }
 
 function getEarnedActivityXp(
@@ -115,7 +87,7 @@ interface Submission {
   id: string;
   share_id: string;
   student_id: string;
-  status: 'completed' | 'submitted';
+  status: 'completed' | 'submitted' | 'verified';
   submission_content: string | null;
   score: number | null;
   completed_at: string;

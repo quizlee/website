@@ -60,7 +60,7 @@ export default function PlayPage() {
           .maybeSingle();
 
         if (shareData?.url && shareData.url.startsWith('content_ids:')) {
-          targetContentIds = shareData.url.replace('content_ids:', '').split(',').map((s) => s.trim()).filter(Boolean);
+          targetContentIds = shareData.url.replace('content_ids:', '').split(',').map((s: string) => s.trim()).filter(Boolean);
         }
       }
 
@@ -254,7 +254,6 @@ export default function PlayPage() {
       }
 
       if (shareId) {
-        const scorePercentage = total > 0 ? Math.round((score / total) * 100) : 100;
         await supabase.from('student_share_submissions').upsert({
           share_id: shareId,
           student_id: profile.id,
