@@ -480,6 +480,31 @@ export default function TeacherClassActivitiesPage() {
       const studentName = sub.student?.full_name || sub.student?.username || 'Student';
       toast(`Verified! Awarded ${xpAmount} XP to ${studentName}! 🌟`, 'success');
 
+      // Send instant real-time broadcast notification to student devices
+      try {
+        const realtimeChannel = supabase.channel('quizlee-realtime-classroom-broadcast');
+        await realtimeChannel.subscribe();
+        await realtimeChannel.send({
+          type: 'broadcast',
+          event: 'submission_verified',
+          payload: {
+            submission_id: sub.id,
+            student_id: sub.student_id,
+            share_id: sub.share_id,
+            xp_amount: xpAmount,
+          },
+        });
+      } catch (bcErr) {
+        console.warn('Realtime verification broadcast warning:', bcErr);
+      }
+
+      try {
+        const bc = new BroadcastChannel('quizlee_classroom_updates');
+        bc.postMessage({ type: 'SUBMISSION_UPDATED', student_id: sub.student_id, timestamp: Date.now() });
+        bc.close();
+      } catch {}
+      localStorage.setItem('quizlee_classroom_sync', Date.now().toString());
+
       // Update local state
       setSubmissions((prev) =>
         prev.map((s) => (s.id === sub.id ? { ...s, status: 'verified' } : s))
@@ -881,9 +906,9 @@ export default function TeacherClassActivitiesPage() {
                   icon: FileText,
                 },
                 practical: {
-                  border: 'border-emerald-200/80 hover:border-emerald-300',
-                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
-                  badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  border: 'border-cyan-200/80 hover:border-cyan-300',
+                  iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white',
+                  badge: 'bg-cyan-50 text-cyan-700 border-cyan-200',
                   label: 'Practical',
                   icon: Monitor,
                 },
@@ -1143,7 +1168,7 @@ export default function TeacherClassActivitiesPage() {
                     sh?.type === 'activity'
                       ? { label: 'Activity', textClass: 'text-indigo-600', icon: '🎮' }
                       : sh?.type === 'practical'
-                      ? { label: 'Practical', textClass: 'text-emerald-600', icon: '💻' }
+                      ? { label: 'Practical', textClass: 'text-cyan-600', icon: '💻' }
                       : { label: 'Copywork', textClass: 'text-amber-600', icon: '✍️' };
 
                   let xpPerItemVal = 10;

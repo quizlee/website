@@ -156,6 +156,7 @@ export default function StudentLayout() {
 
     const handleCustomUpdate = () => {
       fetchPendingCount();
+      useAuthStore.getState().fetchProfile();
     };
 
     // Custom window event listener
@@ -165,6 +166,7 @@ export default function StudentLayout() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'quizlee_classroom_sync') {
         fetchPendingCount();
+        useAuthStore.getState().fetchProfile();
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -176,6 +178,7 @@ export default function StudentLayout() {
       bc.onmessage = (event) => {
         if (event.data?.type === 'MATERIAL_SHARED' || event.data?.type === 'SUBMISSION_UPDATED') {
           fetchPendingCount();
+          useAuthStore.getState().fetchProfile();
         }
       };
     } catch {
@@ -221,6 +224,27 @@ export default function StudentLayout() {
           toast(`📚 New material shared by ${teacherName}: ${shareTitle}`, 'info');
 
           // Play sound chime
+          playNotificationChime();
+        }
+      )
+      .on(
+        'broadcast',
+        { event: 'submission_verified' },
+        (payload) => {
+          const data = payload.payload;
+          if (data?.student_id && data.student_id !== profile.id) return;
+
+          fetchPendingCount();
+          useAuthStore.getState().fetchProfile();
+          window.dispatchEvent(new Event('classroom_activity_updated'));
+
+          const xpAmount = data?.xp_amount || 50;
+          sendDeviceNotification(
+            '🌟 Classroom Activity Verified!',
+            `Your teacher verified your activity (+${xpAmount} XP)!`,
+            () => navigate('/student/class-activities')
+          );
+          toast(`🌟 Classroom submission verified! +${xpAmount} XP earned! 🎉`, 'success');
           playNotificationChime();
         }
       )
@@ -283,6 +307,25 @@ export default function StudentLayout() {
         },
         () => {
           fetchPendingCount();
+          useAuthStore.getState().fetchProfile();
+          window.dispatchEvent(new Event('classroom_activity_updated'));
+        }
+      )
+      .subscribe();
+
+    // Subscribe to profiles changes (to update points / level in real time)
+    const profileChannel = supabase
+      .channel('student-layout-profile-v2')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        () => {
+          useAuthStore.getState().fetchProfile();
         }
       )
       .subscribe();
@@ -299,6 +342,7 @@ export default function StudentLayout() {
       supabase.removeChannel(realtimeBroadcastChannel);
       supabase.removeChannel(sharesChannel);
       supabase.removeChannel(subsChannel);
+      supabase.removeChannel(profileChannel);
     };
   }, [profile?.id, fetchPendingCount, navigate]);
 

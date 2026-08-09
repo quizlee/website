@@ -178,6 +178,7 @@ export default function ClassActivitiesPage() {
     if (!profile?.id) return;
     setLoading(true);
     try {
+      useAuthStore.getState().fetchProfile();
       // 0. Fetch chapters for multi-chapter name resolving
       const { data: allChData } = await supabase.from('chapters').select('id, name');
       if (allChData) {
@@ -461,7 +462,7 @@ export default function ClassActivitiesPage() {
             // Theme configurations
             const cardTheme = isActivity
               ? {
-                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-indigo-100 hover:border-indigo-300 bg-gradient-to-br from-white to-indigo-50/30',
+                  border: isCompleted ? 'border-surface-300' : 'border-indigo-100 hover:border-indigo-300',
                   badge: 'text-indigo-600 font-extrabold',
                   iconBg: 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white',
                   buttonBg: 'bg-gradient-to-r from-primary-600 via-indigo-600 to-primary-700 hover:from-primary-700 hover:to-indigo-800 text-white shadow-sm hover:shadow-md',
@@ -470,7 +471,7 @@ export default function ClassActivitiesPage() {
                 }
               : isDoc
               ? {
-                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-emerald-100 hover:border-emerald-300 bg-gradient-to-br from-white to-emerald-50/30',
+                  border: isCompleted ? 'border-surface-300' : 'border-emerald-100 hover:border-emerald-300',
                   badge: 'text-emerald-600 font-extrabold',
                   iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
                   buttonBg: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-sm hover:shadow-md',
@@ -479,15 +480,15 @@ export default function ClassActivitiesPage() {
                 }
               : isPractical
               ? {
-                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-emerald-100 hover:border-emerald-300 bg-gradient-to-br from-white to-emerald-50/30',
-                  badge: 'text-emerald-600 font-extrabold',
-                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
-                  buttonBg: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-sm hover:shadow-md',
+                  border: isCompleted ? 'border-surface-300' : 'border-cyan-100 hover:border-cyan-300',
+                  badge: 'text-cyan-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-700 hover:from-cyan-700 hover:to-blue-800 text-white shadow-sm hover:shadow-md',
                   label: 'Practical',
                   icon: Monitor,
                 }
               : {
-                  border: isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-amber-100 hover:border-amber-300 bg-gradient-to-br from-white to-amber-50/30',
+                  border: isCompleted ? 'border-surface-300' : 'border-amber-100 hover:border-amber-300',
                   badge: 'text-amber-600 font-extrabold',
                   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white',
                   buttonBg: 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-sm hover:shadow-md',
@@ -502,7 +503,7 @@ export default function ClassActivitiesPage() {
               <div
                 key={share.id}
                 className={`
-                  group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl p-4 sm:p-5 border-2 transition-all duration-200 shadow-sm hover:shadow-md
+                  group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl p-4 sm:p-5 border-2 transition-all duration-200 bg-white shadow-md hover:shadow-xl hover:-translate-y-0.5
                   ${cardTheme.border}
                 `}
               >
@@ -658,20 +659,20 @@ export default function ClassActivitiesPage() {
                       <>
                         {!isActivity ? (
                           submission?.status === 'verified' ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 font-extrabold text-[11px] sm:text-xs border border-emerald-200 shrink-0">
-                              <CheckCircle2 size={13} className="text-emerald-600 fill-emerald-100 shrink-0" />
-                              <span>Verified (+{getShareXp(share)} XP Earned)</span>
+                            <div className="inline-flex items-center gap-1.5 text-green-600 font-extrabold text-[11px] sm:text-xs shrink-0">
+                              <CheckCircle2 size={13} className="text-green-600 shrink-0" />
+                              <span>+{getShareXp(share)} XP Earned</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 font-extrabold text-[11px] sm:text-xs border border-amber-200/80 shrink-0">
+                            <div className="inline-flex items-center gap-1.5 text-amber-700 font-extrabold text-[11px] sm:text-xs shrink-0">
                               <Clock size={13} className="text-amber-600 shrink-0 animate-pulse" />
                               <span>Pending Verification (+{getShareXp(share)} XP)</span>
                             </div>
                           )
                         ) : (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 font-extrabold text-[11px] sm:text-xs border border-emerald-200 shrink-0">
-                            <CheckCircle2 size={13} className="text-emerald-600 fill-emerald-100 shrink-0" />
-                            <span>Completed (+{getEarnedActivityXp(share, submission)} XP Earned)</span>
+                          <div className="inline-flex items-center gap-1.5 text-green-600 font-extrabold text-[11px] sm:text-xs shrink-0">
+                            <CheckCircle2 size={13} className="text-green-600 shrink-0" />
+                            <span>+{getEarnedActivityXp(share, submission)} XP Earned</span>
                           </div>
                         )}
 
@@ -704,7 +705,7 @@ export default function ClassActivitiesPage() {
                         })}
                       </>
                     ) : (
-                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100/80 text-amber-800 font-bold text-[11px] sm:text-xs shrink-0">
+                      <div className="inline-flex items-center gap-1 text-amber-700 font-bold text-[11px] sm:text-xs shrink-0">
                         <Clock size={12} className="text-amber-600 shrink-0" />
                         <span>Pending</span>
                       </div>
