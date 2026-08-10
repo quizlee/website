@@ -174,6 +174,82 @@ const ChapterCard = memo(function ChapterCard({
   );
 });
 
+interface ActivityCardItemProps {
+  activity: Activity;
+  isLocked: boolean;
+  isDisabled: boolean;
+  isContentAvailable: boolean;
+  onClick: (activity: Activity) => void;
+}
+
+const ActivityCardItem = memo(function ActivityCardItem({
+  activity,
+  isLocked,
+  isDisabled,
+  isContentAvailable,
+  onClick,
+}: ActivityCardItemProps) {
+  const cardColor = activity.color || '#6366f1';
+  return (
+    <div
+      onClick={() => onClick(activity)}
+      className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${
+        isLocked ? 'opacity-70' : 'hover:-translate-y-1'
+      }`}
+      style={{
+        background: '#ffffff',
+        boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
+      }}
+      onMouseEnter={(e) => {
+        if (!isLocked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`;
+      }}
+    >
+      {/* Glow blob */}
+      <div
+        className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
+        style={{ background: cardColor }}
+      />
+      {isLocked && (
+        <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[3px] flex items-center justify-center p-2 pointer-events-none z-20">
+          <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
+            <Lock size={13} className="text-slate-600" /> Locked
+          </span>
+        </div>
+      )}
+      {!isLocked && !isDisabled && !isContentAvailable && (
+        <div className="absolute inset-0 rounded-3xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
+          <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
+            🚀 Coming Soon
+          </span>
+        </div>
+      )}
+      <div
+        className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
+        style={{
+          background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
+          boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
+        }}
+      >
+        {activity.emoji || (activity.zone === 'play' ? '🎮' : '📄')}
+      </div>
+      <div className="flex-grow min-w-0 relative z-10">
+        <h4
+          className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+          style={{ color: cardColor }}
+        >
+          {activity.label}
+        </h4>
+        <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">
+          {activity.description}
+        </p>
+      </div>
+    </div>
+  );
+});
+
 export default function PracticePage() {
   const { profile } = useAuthStore();
   const navigate = useNavigate();
@@ -202,7 +278,10 @@ export default function PracticePage() {
   }, [selectedSubjectIdx]);
 
   useEffect(() => {
-    localStorage.setItem('practice_selected_chapters', JSON.stringify(selectedChapterIds));
+    const timer = setTimeout(() => {
+      localStorage.setItem('practice_selected_chapters', JSON.stringify(selectedChapterIds));
+    }, 100);
+    return () => clearTimeout(timer);
   }, [selectedChapterIds]);
 
   // Monitor scroll positioning to hide/show subject card (state-guarded scroll handler)
@@ -397,9 +476,54 @@ export default function PracticePage() {
     navigate(`/student/play?${params.toString()}`);
   };
 
-  const handleComingSoonClick = (feature: string) => {
+  const handleComingSoonClick = useCallback((feature: string) => {
     toast(`${feature} is coming soon! 🚀`, 'info');
-  };
+  }, []);
+
+  const handleTestActivityClick = useCallback(
+    (activity: Activity) => {
+      if (activity.is_locked) {
+        toast(`${activity.label} is locked 🔒`, 'error');
+        return;
+      }
+      if (selectedChapterIds.length === 0) {
+        toast('Pick at least one chapter above first! 📚', 'error');
+        return;
+      }
+      const isContentAvailable = availableActivityTypesSet.has(activity.key);
+      if (!isContentAvailable) {
+        toast(`${activity.label} is coming soon! 🚀`, 'info');
+        return;
+      }
+      handleComingSoonClick(activity.label);
+    },
+    [selectedChapterIds.length, availableActivityTypesSet, handleComingSoonClick]
+  );
+
+  const handlePlayActivityClick = useCallback(
+    (activity: Activity) => {
+      if (activity.is_locked) {
+        toast(`${activity.label} is locked 🔒`, 'error');
+        return;
+      }
+      if (selectedChapterIds.length === 0) {
+        toast('Pick at least one chapter above first! 📚', 'error');
+        return;
+      }
+      const isContentAvailable = availableActivityTypesSet.has(activity.key);
+      if (!isContentAvailable) {
+        toast(`${activity.label} is coming soon! 🚀`, 'info');
+        return;
+      }
+      const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
+      if (isPlayable) {
+        handleActivityClick(activity.key);
+      } else {
+        handleComingSoonClick(activity.label);
+      }
+    },
+    [selectedChapterIds.length, availableActivityTypesSet, handleComingSoonClick]
+  );
 
   // Scroll chapter strip
   const scrollChapters = (dir: 'left' | 'right') => {
@@ -554,8 +678,8 @@ export default function PracticePage() {
             {/* Scrollable chapter strip */}
             <div
               ref={chapterScrollRef}
-              className="flex gap-4 overflow-x-auto pb-5 snap-x scroll-smooth"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              className="flex gap-4 overflow-x-auto pb-5 snap-x overscroll-x-contain"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
             >
               {loadingChapters ? (
                 Array.from({ length: 4 }).map((_, i) => (
@@ -595,73 +719,16 @@ export default function PracticePage() {
             </div>
           )}
           <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-opacity duration-200 ${selectedChapterIds.length === 0 ? 'opacity-40 select-none' : ''}`}>
-            {testActivities.map((activity) => {
-              const cardColor = activity.color || '#6366f1';
-              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key);
-              return (
-                <div
-                  key={activity.key}
-                  onClick={() => {
-                    if (activity.is_locked) {
-                      toast(`${activity.label} is locked 🔒`, 'error');
-                      return;
-                    }
-                    if (selectedChapterIds.length === 0) {
-                      toast('Pick at least one chapter above first! 📚', 'error');
-                      return;
-                    }
-                    if (!isContentAvailable) {
-                      toast(`${activity.label} is coming soon! 🚀`, 'info');
-                      return;
-                    }
-                    handleComingSoonClick(activity.label);
-                  }}
-                  className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
-                  style={{
-                    background: '#ffffff',
-                    boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
-                  }}
-                  onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
-                >
-                  {/* Glow blob */}
-                  <div
-                    className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
-                    style={{ background: cardColor }}
-                  />
-                  {activity.is_locked && (
-                    <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[3px] flex items-center justify-center p-2 pointer-events-none z-20">
-                      <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
-                        <Lock size={13} className="text-slate-600" /> Locked
-                      </span>
-                    </div>
-                  )}
-                  {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
-                    <div className="absolute inset-0 rounded-3xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                      <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                        🚀 Coming Soon
-                      </span>
-                    </div>
-                  )}
-                  <div
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
-                    style={{
-                      background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
-                      boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
-                    }}
-                  >
-                    {activity.emoji || '📄'}
-                  </div>
-                  <div className="flex-grow min-w-0 relative z-10">
-                    <h4
-                      className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
-                      style={{ color: cardColor }}
-                    >{activity.label}</h4>
-                    <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
-                  </div>
-                </div>
-              );
-            })}
+            {testActivities.map((activity) => (
+              <ActivityCardItem
+                key={activity.key}
+                activity={activity}
+                isLocked={activity.is_locked}
+                isDisabled={selectedChapterIds.length === 0}
+                isContentAvailable={selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key)}
+                onClick={handleTestActivityClick}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -679,79 +746,16 @@ export default function PracticePage() {
             </div>
           )}
           <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-opacity duration-200 ${selectedChapterIds.length === 0 ? 'opacity-40 select-none' : ''}`}>
-            {playActivities.map((activity) => {
-              const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
-              const cardColor = activity.color || '#6366f1';
-              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key);
-              const handleClick = () => {
-                if (activity.is_locked) {
-                  toast(`${activity.label} is locked 🔒`, 'error');
-                  return;
-                }
-                if (selectedChapterIds.length === 0) {
-                  toast('Pick at least one chapter above first! 📚', 'error');
-                  return;
-                }
-                if (!isContentAvailable) {
-                  toast(`${activity.label} is coming soon! 🚀`, 'info');
-                  return;
-                }
-                if (isPlayable) {
-                  handleActivityClick(activity.key);
-                } else {
-                  handleComingSoonClick(activity.label);
-                }
-              };
-              return (
-                <div
-                  key={activity.key}
-                  onClick={handleClick}
-                  className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
-                  style={{
-                    background: '#ffffff',
-                    boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
-                  }}
-                  onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
-                >
-                  {/* Glow blob */}
-                  <div
-                    className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
-                    style={{ background: cardColor }}
-                  />
-                  {activity.is_locked && (
-                    <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[3px] flex items-center justify-center p-2 pointer-events-none z-20">
-                      <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
-                        <Lock size={13} className="text-slate-600" /> Locked
-                      </span>
-                    </div>
-                  )}
-                  {!activity.is_locked && selectedChapterIds.length > 0 && !isContentAvailable && (
-                    <div className="absolute inset-0 rounded-3xl bg-surface-900/5 flex items-start justify-end p-2 pointer-events-none z-10">
-                      <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                        🚀 Coming Soon
-                      </span>
-                    </div>
-                  )}
-                  <div
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
-                    style={{
-                      background: `linear-gradient(135deg, ${cardColor}cc, ${cardColor})`,
-                      boxShadow: `0 4px 14px 0 ${cardColor}60, 0 1px 4px 0 ${cardColor}40`,
-                    }}
-                  >
-                    {activity.emoji || '🎮'}
-                  </div>
-                  <div className="flex-grow relative z-10">
-                    <h4
-                      className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
-                      style={{ color: cardColor }}
-                    >{activity.label}</h4>
-                    <p className="text-xs sm:text-sm text-on-surface-variant leading-snug font-semibold mt-0.5 line-clamp-2">{activity.description}</p>
-                  </div>
-                </div>
-              );
-            })}
+            {playActivities.map((activity) => (
+              <ActivityCardItem
+                key={activity.key}
+                activity={activity}
+                isLocked={activity.is_locked}
+                isDisabled={selectedChapterIds.length === 0}
+                isContentAvailable={selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key)}
+                onClick={handlePlayActivityClick}
+              />
+            ))}
           </div>
         </div>
       </section>
