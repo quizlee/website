@@ -14,6 +14,9 @@ interface Stats {
   schoolRank: number | null;
 }
 
+// Module-level in-memory cache for play zone activities
+let playZoneActivitiesCache: Activity[] | null = null;
+
 export default function StudentHomePage() {
   const { profile } = useAuthStore();
   const navigate = useNavigate();
@@ -29,10 +32,14 @@ export default function StudentHomePage() {
   });
 
   // Activities from DB (admin-managed)
-  const [activities, setActivities] = useState<Activity[]>([]);
-  
-  // Fetch play zone activities from DB
+  const [activities, setActivities] = useState<Activity[]>(() => playZoneActivitiesCache || []);
+
+  // Fetch play zone activities from DB (with instant cache)
   useEffect(() => {
+    if (playZoneActivitiesCache) {
+      setActivities(playZoneActivitiesCache);
+      return;
+    }
     supabase
       .from('activities')
       .select('*')
@@ -40,55 +47,66 @@ export default function StudentHomePage() {
       .eq('zone', 'play')
       .order('sort_order')
       .then(({ data }) => {
-        if (data) setActivities(data as Activity[]);
+        if (data) {
+          playZoneActivitiesCache = data as Activity[];
+          setActivities(playZoneActivitiesCache);
+        }
       });
   }, []);
 
-  // Fetch student stats
+  // Fetch student stats with optimized queries and single-pass calculation
   useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const userPoints = profile.points || 0;
+
     async function fetchStats() {
-      if (!profile?.id) return;
+      const todayMidnight = new Date().setHours(0, 0, 0, 0);
 
-      const { data: attemptsData } = await supabase
-        .from('activity_attempts')
-        .select('*')
-        .eq('user_id', profile.id);
+      const [attemptsRes, rankRes] = await Promise.all([
+        supabase
+          .from('activity_attempts')
+          .select('created_at, score, total_questions, points_earned')
+          .eq('user_id', userId),
+        supabase
+          .from('leaderboard')
+          .select('school_rank')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ]);
 
-      const totalPlayed = attemptsData ? attemptsData.length : 0;
-      const avgScore = totalPlayed > 0
-        ? Math.round(
-            attemptsData!.reduce(
-              (acc, curr) => acc + (curr.total_questions > 0 ? (curr.score / curr.total_questions) * 100 : 0),
-              0
-            ) / totalPlayed
-          )
-        : 0;
+      const attemptsData = attemptsRes.data || [];
+      const totalPlayed = attemptsData.length;
 
-      const todayStr = new Date().toDateString();
-      const todayAttempts = attemptsData ? attemptsData.filter(a => new Date(a.created_at).toDateString() === todayStr) : [];
-      const activitiesCompletedToday = todayAttempts.length;
-      const xpEarnedToday = todayAttempts.reduce((acc, curr) => acc + (curr.points_earned || 0), 0);
+      let totalScorePct = 0;
+      let completedToday = 0;
+      let xpToday = 0;
 
-      const { data: rankData } = await supabase
-        .from('leaderboard')
-        .select('school_rank')
-        .eq('user_id', profile.id)
-        .single();
+      for (let i = 0; i < attemptsData.length; i++) {
+        const a = attemptsData[i];
+        if (a.total_questions > 0) {
+          totalScorePct += (a.score / a.total_questions) * 100;
+        }
+        if (new Date(a.created_at).getTime() >= todayMidnight) {
+          completedToday++;
+          xpToday += a.points_earned || 0;
+        }
+      }
+
+      const avgScore = totalPlayed > 0 ? Math.round(totalScorePct / totalPlayed) : 0;
 
       setStats({
         totalActivities: totalPlayed,
-        activitiesCompletedToday,
+        activitiesCompletedToday: completedToday,
         avgAccuracy: avgScore,
-        xpEarnedToday,
-        totalPoints: profile.points || 0,
-        schoolRank: rankData?.school_rank || null,
+        xpEarnedToday: xpToday,
+        totalPoints: userPoints,
+        schoolRank: rankRes.data?.school_rank || null,
       });
     }
 
-    if (profile?.id) {
-      fetchStats();
-    }
-  }, [profile]);
+    fetchStats();
+  }, [profile?.id, profile?.points]);
 
 
   const handleActivityClick = () => {

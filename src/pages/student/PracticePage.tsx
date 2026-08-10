@@ -205,18 +205,21 @@ export default function PracticePage() {
     localStorage.setItem('practice_selected_chapters', JSON.stringify(selectedChapterIds));
   }, [selectedChapterIds]);
 
-  // Monitor scroll positioning to hide/show subject card
+  // Monitor scroll positioning to hide/show subject card (state-guarded scroll handler)
+  const handleScroll = useCallback(() => {
+    const el = chapterScrollRef.current;
+    if (!el) return;
+    const isAtStart = el.scrollLeft <= 5;
+    setShowSubjectCard((prev) => (prev !== isAtStart ? isAtStart : prev));
+  }, []);
+
   useEffect(() => {
     const el = chapterScrollRef.current;
     if (!el) return;
 
-    const handleScroll = () => {
-      setShowSubjectCard(el.scrollLeft <= 5);
-    };
-
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [handleScroll]);
 
   // Modal state
   const [activeActivityType, setActiveActivityType] = useState<string | null>(null);
@@ -252,6 +255,11 @@ export default function PracticePage() {
     });
     return Array.from(typesSet);
   }, [selectedChapterIds, chapterContentMap]);
+
+  const availableActivityTypesSet = useMemo(() => new Set(availableActivityTypes), [availableActivityTypes]);
+
+  const testActivities = useMemo(() => activities.filter((a) => a.zone === 'test'), [activities]);
+  const playActivities = useMemo(() => activities.filter((a) => a.zone === 'play'), [activities]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -580,16 +588,16 @@ export default function PracticePage() {
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Test Zone</h3>
         </div>
         <div className={`relative transition-all duration-300 ${selectedChapterIds.length === 0 ? 'pointer-events-none' : ''}`}>
-          {/* Blur overlay when no chapter selected */}
+          {/* Overlay when no chapter selected */}
           {selectedChapterIds.length === 0 && (
-            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3" style={{ backdropFilter: 'blur(6px)', background: 'rgba(240,244,255,0.60)' }}>
+            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3 bg-surface-50/85 backdrop-blur-[2px]">
               <p className="text-sm font-extrabold text-surface-700 text-center px-4">Select a chapter above to unlock</p>
             </div>
           )}
-          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-all duration-300 ${selectedChapterIds.length === 0 ? 'blur-[3px] select-none' : ''}`}>
-            {activities.filter(a => a.zone === 'test').map((activity) => {
+          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-opacity duration-200 ${selectedChapterIds.length === 0 ? 'opacity-40 select-none' : ''}`}>
+            {testActivities.map((activity) => {
               const cardColor = activity.color || '#6366f1';
-              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
+              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key);
               return (
                 <div
                   key={activity.key}
@@ -664,17 +672,17 @@ export default function PracticePage() {
           <h3 className="text-2xl font-extrabold text-surface-900 tracking-tight">Play Zone</h3>
         </div>
         <div className={`relative transition-all duration-300 ${selectedChapterIds.length === 0 ? 'pointer-events-none' : ''}`}>
-          {/* Blur overlay when no chapter selected */}
+          {/* Overlay when no chapter selected */}
           {selectedChapterIds.length === 0 && (
-            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3" style={{ backdropFilter: 'blur(6px)', background: 'rgba(240,244,255,0.60)' }}>
+            <div className="absolute inset-0 z-20 rounded-3xl flex flex-col items-center justify-center gap-3 bg-surface-50/85 backdrop-blur-[2px]">
               <p className="text-sm font-extrabold text-surface-700 text-center px-4">Select a chapter above to unlock</p>
             </div>
           )}
-          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-all duration-300 ${selectedChapterIds.length === 0 ? 'blur-[3px] select-none' : ''}`}>
-            {activities.filter(a => a.zone === 'play').map((activity) => {
+          <div className={`grid grid-cols-2 lg:grid-cols-4 gap-gutter transition-opacity duration-200 ${selectedChapterIds.length === 0 ? 'opacity-40 select-none' : ''}`}>
+            {playActivities.map((activity) => {
               const isPlayable = ['quiz', 'flashcard', 'matching', 'picture', 'dragndrop'].includes(activity.key);
               const cardColor = activity.color || '#6366f1';
-              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypes.includes(activity.key);
+              const isContentAvailable = selectedChapterIds.length > 0 && availableActivityTypesSet.has(activity.key);
               const handleClick = () => {
                 if (activity.is_locked) {
                   toast(`${activity.label} is locked 🔒`, 'error');
