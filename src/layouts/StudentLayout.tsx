@@ -464,7 +464,13 @@ export default function StudentLayout() {
               {/* Classroom icon */}
               {hasConnectedTeacher && (
                 <button 
-                  onClick={() => navigate('/student/class-activities')}
+                  onClick={() => {
+                    if (location.pathname === '/student/class-activities') {
+                      window.location.reload();
+                    } else {
+                      navigate('/student/class-activities');
+                    }
+                  }}
                   className="p-1.5 sm:p-2 rounded-full hover:bg-surface-100 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center bouncy cursor-pointer shrink-0 relative"
                   title={`Classroom Activities${pendingCount > 0 ? ` (${pendingCount} pending)` : ''}`}
                 >

@@ -611,7 +611,6 @@ export default function PracticePage() {
                   className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
                   style={{
                     background: '#ffffff',
-                    border: `1.5px solid ${cardColor}50`,
                     boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
                   }}
                   onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}
@@ -702,7 +701,6 @@ export default function PracticePage() {
                   className={`group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 ${activity.is_locked ? 'opacity-70' : 'hover:-translate-y-1'}`}
                   style={{
                     background: '#ffffff',
-                    border: `1.5px solid ${cardColor}50`,
                     boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
                   }}
                   onMouseEnter={e => { if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`; }}

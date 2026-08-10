@@ -104,18 +104,19 @@ export default function ClassActivitiesPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [chaptersMap, setChaptersMap] = useState<Record<string, string>>({});
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
-    fetchClassActivities();
+    fetchClassActivities(false);
 
     const handleCustomUpdate = () => {
-      fetchClassActivities();
+      fetchClassActivities(true);
     };
     window.addEventListener('classroom_activity_updated', handleCustomUpdate);
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'quizlee_classroom_sync') {
-        fetchClassActivities();
+        fetchClassActivities(true);
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -125,7 +126,7 @@ export default function ClassActivitiesPage() {
       bc = new BroadcastChannel('quizlee_classroom_updates');
       bc.onmessage = (event) => {
         if (event.data?.type === 'MATERIAL_SHARED' || event.data?.type === 'SUBMISSION_UPDATED') {
-          fetchClassActivities();
+          fetchClassActivities(true);
         }
       };
     } catch {}
@@ -140,7 +141,7 @@ export default function ClassActivitiesPage() {
           table: 'teacher_shares',
         },
         () => {
-          fetchClassActivities();
+          fetchClassActivities(true);
         }
       )
       .subscribe();
@@ -156,7 +157,7 @@ export default function ClassActivitiesPage() {
           filter: profile?.id ? `student_id=eq.${profile.id}` : undefined,
         },
         () => {
-          fetchClassActivities();
+          fetchClassActivities(true);
         }
       )
       .subscribe();
@@ -174,9 +175,11 @@ export default function ClassActivitiesPage() {
     };
   }, [profile?.id]);
 
-  async function fetchClassActivities() {
+  async function fetchClassActivities(silent = false) {
     if (!profile?.id) return;
-    setLoading(true);
+    if (!silent && !hasLoadedOnce) {
+      setLoading(true);
+    }
     try {
       useAuthStore.getState().fetchProfile();
       // 0. Fetch chapters for multi-chapter name resolving
@@ -199,6 +202,7 @@ export default function ClassActivitiesPage() {
       if (!relations || relations.length === 0) {
         setShares([]);
         setLoading(false);
+        setHasLoadedOnce(true);
         return;
       }
 
@@ -249,13 +253,15 @@ export default function ClassActivitiesPage() {
         }
       }
 
-      const hasPending = allShares.some((s) => !subMap[s.id]);
-      if (hasPending) {
-        setActiveTab('pending');
-      } else if (allShares.length > 0) {
-        setActiveTab('completed');
-      } else {
-        setActiveTab('pending');
+      if (!hasLoadedOnce) {
+        const hasPending = allShares.some((s) => !subMap[s.id]);
+        if (hasPending) {
+          setActiveTab('pending');
+        } else if (allShares.length > 0) {
+          setActiveTab('completed');
+        } else {
+          setActiveTab('pending');
+        }
       }
 
       setShares(allShares);
@@ -266,6 +272,7 @@ export default function ClassActivitiesPage() {
       toast(error.message, 'error');
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }
 
@@ -278,18 +285,9 @@ export default function ClassActivitiesPage() {
       return;
     }
 
-    setTogglingId(shareId);
-
     try {
       if (currentSub) {
-        // Delete submission (mark as pending)
-        const { error } = await supabase
-          .from('student_share_submissions')
-          .delete()
-          .eq('id', currentSub.id);
-
-        if (error) throw error;
-
+        // Optimistically delete submission (mark as pending)
         setSubmissions((prev) => {
           const next = { ...prev };
           delete next[shareId];
@@ -302,9 +300,46 @@ export default function ClassActivitiesPage() {
           }
           return next;
         });
+
+        const { error } = await supabase
+          .from('student_share_submissions')
+          .delete()
+          .eq('id', currentSub.id);
+
+        if (error) {
+          // Rollback on error
+          setSubmissions((prev) => ({ ...prev, [shareId]: currentSub }));
+          setAllSubmissionsMap((prev) => ({
+            ...prev,
+            [shareId]: [...(prev[shareId] || []), currentSub],
+          }));
+          throw error;
+        }
+
         toast('Marked as pending', 'info');
       } else {
-        // Create submission (mark as completed)
+        // Optimistically create temp submission
+        const tempSub: Submission = {
+          id: 'temp_' + Date.now(),
+          share_id: shareId,
+          student_id: profile.id,
+          status: 'completed',
+          submission_content: 'Marked complete',
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          student: {
+            full_name: profile.full_name || '',
+            username: profile.username || '',
+            avatar_url: profile.avatar_url || '',
+          },
+        };
+
+        setSubmissions((prev) => ({ ...prev, [shareId]: tempSub }));
+        setAllSubmissionsMap((prev) => ({
+          ...prev,
+          [shareId]: [...(prev[shareId] || []).filter((s) => s.student_id !== profile.id), tempSub],
+        }));
+
         const { data, error } = await supabase
           .from('student_share_submissions')
           .upsert(
@@ -323,7 +358,22 @@ export default function ClassActivitiesPage() {
           `)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Rollback on error
+          setSubmissions((prev) => {
+            const next = { ...prev };
+            delete next[shareId];
+            return next;
+          });
+          setAllSubmissionsMap((prev) => {
+            const next = { ...prev };
+            if (next[shareId]) {
+              next[shareId] = next[shareId].filter((s) => s.student_id !== profile.id);
+            }
+            return next;
+          });
+          throw error;
+        }
 
         const newSub = data as Submission;
         setSubmissions((prev) => ({ ...prev, [shareId]: newSub }));
@@ -337,8 +387,6 @@ export default function ClassActivitiesPage() {
     } catch (error: any) {
       console.error('Error updating status:', error);
       toast(error.message, 'error');
-    } finally {
-      setTogglingId(null);
     }
   }
 
@@ -480,10 +528,10 @@ export default function ClassActivitiesPage() {
                 }
               : isPractical
               ? {
-                  border: isCompleted ? 'border-surface-300' : 'border-cyan-100 hover:border-cyan-300',
-                  badge: 'text-cyan-600 font-extrabold',
-                  iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white',
-                  buttonBg: 'bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-700 hover:from-cyan-700 hover:to-blue-800 text-white shadow-sm hover:shadow-md',
+                  border: isCompleted ? 'border-surface-300' : 'border-rose-100 hover:border-rose-300',
+                  badge: 'text-rose-600 font-extrabold',
+                  iconBg: 'bg-gradient-to-br from-rose-500 to-pink-600 text-white',
+                  buttonBg: 'bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 hover:from-rose-700 hover:to-pink-800 text-white shadow-sm hover:shadow-md',
                   label: 'Practical',
                   icon: Monitor,
                 }
@@ -511,11 +559,11 @@ export default function ClassActivitiesPage() {
                   {/* Card Header Row */}
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <div className={`p-1.5 sm:p-2 rounded-xl ${cardTheme.iconBg} shadow-sm shrink-0`}>
-                        <IconComponent size={15} />
+                      <div className={`p-1.5 sm:p-2 rounded-xl ${isCompleted ? 'bg-surface-100 text-surface-400 border border-surface-200/80' : cardTheme.iconBg} shadow-sm shrink-0`}>
+                        {isCompleted ? <Check size={15} className="stroke-[2.5]" /> : <IconComponent size={15} />}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className={`text-[10px] sm:text-[11px] uppercase tracking-wider ${cardTheme.badge} shrink-0`}>
+                        <span className={`text-[10px] sm:text-[11px] uppercase tracking-wider ${isCompleted ? 'text-surface-400 font-extrabold' : cardTheme.badge} shrink-0`}>
                           {cardTheme.label}
                         </span>
                         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-surface-400 shrink-0">
@@ -525,7 +573,7 @@ export default function ClassActivitiesPage() {
                       </div>
                     </div>
 
-                    {/* Top Right Corner: Undo button when completed, XP tag when pending */}
+                    {/* Top Right Corner: Submit button when pending, Undo button when completed */}
                     <div className="shrink-0 ml-auto">
                       {isCompleted ? (
                         !isActivity && submission?.status !== 'verified' && (
@@ -541,21 +589,71 @@ export default function ClassActivitiesPage() {
                           </button>
                         )
                       ) : (
+                        !isActivity && (
+                          <button
+                            type="button"
+                            onClick={() => toggleMarkComplete(share.id)}
+                            disabled={togglingId === share.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                            title="Submit"
+                          >
+                            <Check size={11} className="shrink-0 text-emerald-600 stroke-[3]" />
+                            <span>Submit</span>
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title Heading */}
+                  <h3 className={`text-sm sm:text-base font-extrabold transition-colors leading-snug line-clamp-2 mb-3 break-words ${isCompleted ? 'line-through text-surface-400' : 'text-surface-900 group-hover:text-primary'}`}>
+                    {share.title}
+                  </h3>
+
+                  {/* Action Buttons & XP Tag (Hidden when completed) */}
+                  {!isCompleted && (
+                    <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-2.5">
+                      {isActivity && (share.chapter_id || share.url?.startsWith('content_ids:')) && share.activity_type && (
                         <>
-                          {!isActivity && (
-                            <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 shrink-0">
-                              ⭐ +{getShareXp(share)} XP
-                            </span>
-                          )}
-                          {isActivity && (() => {
+                          <Button
+                            size="md"
+                            onClick={() => {
+                              const params = new URLSearchParams();
+                              let chIds: string[] = [];
+                              if (share.description) {
+                                try {
+                                  const parsed = JSON.parse(share.description);
+                                  if (Array.isArray(parsed.chapter_ids) && parsed.chapter_ids.length > 0) {
+                                    chIds = parsed.chapter_ids;
+                                  }
+                                } catch {}
+                              }
+                              if (chIds.length > 0) {
+                                chIds.forEach((id) => params.append('chapters', id));
+                              } else if (share.chapter_id) {
+                                params.append('chapters', share.chapter_id);
+                              }
+                              params.set('type', share.activity_type!);
+                              params.set('mode', 'practice');
+                              params.set('share_id', share.id);
+                              if (share.url && share.url.startsWith('content_ids:')) {
+                                params.set('content_ids', share.url.replace('content_ids:', ''));
+                              }
+                              params.set('from', '/student/class-activities');
+                              navigate(`/student/play?${params.toString()}`);
+                            }}
+                            icon={<Play size={14} className="fill-current shrink-0" />}
+                            className={`w-fit px-4 sm:px-5 py-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${cardTheme.buttonBg}`}
+                          >
+                            Start
+                          </Button>
+                          {(() => {
                             let xpPerItemVal = 10;
                             if (share.description) {
                               try {
                                 const parsed = JSON.parse(share.description);
                                 if (parsed.xp_per_item !== undefined) xpPerItemVal = Number(parsed.xp_per_item) || 10;
-                              } catch {
-                                // fallback
-                              }
+                              } catch {}
                             }
                             let itemCount = 10;
                             if (share.url?.startsWith('content_ids:')) {
@@ -563,61 +661,16 @@ export default function ClassActivitiesPage() {
                             }
                             const totalXp = itemCount * xpPerItemVal;
                             return (
-                              <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 shrink-0">
+                              <span className="text-xs sm:text-sm font-extrabold text-amber-600 shrink-0">
                                 ⭐ +{totalXp} XP
                               </span>
                             );
                           })()}
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Title Heading */}
-                  <h3 className="text-sm sm:text-base font-extrabold text-surface-900 group-hover:text-primary transition-colors leading-snug line-clamp-2 mb-3 break-words">
-                    {share.title}
-                  </h3>
-
-                  {/* Action Buttons (Hidden when completed) */}
-                  {!isCompleted && (
-                    <div className="mb-3 sm:mb-4">
-                      {isActivity && (share.chapter_id || share.url?.startsWith('content_ids:')) && share.activity_type && (
-                        <Button
-                          size="md"
-                          onClick={() => {
-                            const params = new URLSearchParams();
-                            let chIds: string[] = [];
-                            if (share.description) {
-                              try {
-                                const parsed = JSON.parse(share.description);
-                                if (Array.isArray(parsed.chapter_ids) && parsed.chapter_ids.length > 0) {
-                                  chIds = parsed.chapter_ids;
-                                }
-                              } catch {}
-                            }
-                            if (chIds.length > 0) {
-                              chIds.forEach((id) => params.append('chapters', id));
-                            } else if (share.chapter_id) {
-                              params.append('chapters', share.chapter_id);
-                            }
-                            params.set('type', share.activity_type!);
-                            params.set('mode', 'practice');
-                            params.set('share_id', share.id);
-                            if (share.url && share.url.startsWith('content_ids:')) {
-                              params.set('content_ids', share.url.replace('content_ids:', ''));
-                            }
-                            params.set('from', '/student/class-activities');
-                            navigate(`/student/play?${params.toString()}`);
-                          }}
-                          icon={<Play size={14} className="fill-current shrink-0" />}
-                          className={`w-fit px-4 sm:px-5 py-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${cardTheme.buttonBg}`}
-                        >
-                          ⚡ Start
-                        </Button>
-                      )}
 
                       {!isActivity && (
-                        <div className="flex items-center gap-2">
+                        <>
                           {share.url && (
                             <a
                               href={share.url.startsWith('http') ? share.url : `https://${share.url}`}
@@ -634,18 +687,10 @@ export default function ClassActivitiesPage() {
                             </a>
                           )}
 
-                          <Button
-                            size="md"
-                            variant="ghost"
-                            onClick={() => toggleMarkComplete(share.id)}
-                            loading={togglingId === share.id}
-                            icon={<Check size={14} />}
-                            className="w-fit px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold shrink-0 border-0 hover:bg-surface-200/60"
-                            title="Mark as completed"
-                          >
-                            Mark Done
-                          </Button>
-                        </div>
+                          <span className="text-xs sm:text-sm font-extrabold text-amber-600 shrink-0">
+                            ⭐ +{getShareXp(share)} XP
+                          </span>
+                        </>
                       )}
                     </div>
                   )}

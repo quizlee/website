@@ -906,9 +906,9 @@ export default function TeacherClassActivitiesPage() {
                   icon: FileText,
                 },
                 practical: {
-                  border: 'border-cyan-200/80 hover:border-cyan-300',
-                  iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white',
-                  badge: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+                  border: 'border-rose-200/80 hover:border-rose-300',
+                  iconBg: 'bg-gradient-to-br from-rose-500 to-pink-600 text-white',
+                  badge: 'bg-rose-50 text-rose-700 border-rose-200',
                   label: 'Practical',
                   icon: Monitor,
                 },
@@ -1168,7 +1168,7 @@ export default function TeacherClassActivitiesPage() {
                     sh?.type === 'activity'
                       ? { label: 'Activity', textClass: 'text-indigo-600', icon: '🎮' }
                       : sh?.type === 'practical'
-                      ? { label: 'Practical', textClass: 'text-cyan-600', icon: '💻' }
+                      ? { label: 'Practical', textClass: 'text-rose-600', icon: '💻' }
                       : { label: 'Copywork', textClass: 'text-amber-600', icon: '✍️' };
 
                   let xpPerItemVal = 10;
