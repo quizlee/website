@@ -25,6 +25,8 @@ export function QuizActivity({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromUrl = searchParams.get('from');
+  const shareId = searchParams.get('share_id');
+  const isClassroom = Boolean(shareId || fromUrl === '/student/class-activities' || fromUrl?.includes('class-activities'));
 
   const handleExit = () => {
     clearActivePlaySession();
@@ -364,19 +366,21 @@ export function QuizActivity({
               <span className="hidden sm:inline">Quit Quiz</span>
             </button>
 
-            {/* Skip Button */}
-            <button 
-              disabled={isAnswered}
-              onClick={handleSkip}
-              className={`flex items-center justify-center w-10 h-10 rounded-full select-none transition-all ${
-                !isAnswered
-                  ? 'bg-white text-amber-500 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border border-amber-200 shadow-sm'
-                  : 'bg-slate-50 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50'
-              }`}
-              title="Skip Question"
-            >
-              <span className="material-symbols-outlined text-xl">fast_forward</span>
-            </button>
+            {/* Skip Button (hidden for classroom quizzes) */}
+            {!isClassroom && (
+              <button 
+                disabled={isAnswered}
+                onClick={handleSkip}
+                className={`flex items-center justify-center w-10 h-10 rounded-full select-none transition-all ${
+                  !isAnswered
+                    ? 'bg-white text-amber-500 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border border-amber-200 shadow-sm'
+                    : 'bg-slate-50 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50'
+                }`}
+                title="Skip Question"
+              >
+                <span className="material-symbols-outlined text-xl">fast_forward</span>
+              </button>
+            )}
           </div>
 
           {/* Center: Progress Dot Indicator */}

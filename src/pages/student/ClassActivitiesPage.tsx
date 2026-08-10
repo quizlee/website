@@ -91,6 +91,7 @@ interface Submission {
   submission_content: string | null;
   score: number | null;
   completed_at: string;
+  created_at?: string;
   student?: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
 }
 
@@ -102,7 +103,6 @@ export default function ClassActivitiesPage() {
   const [submissions, setSubmissions] = useState<Record<string, Submission>>({});
   const [allSubmissionsMap, setAllSubmissionsMap] = useState<Record<string, Submission[]>>({});
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
-  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [chaptersMap, setChaptersMap] = useState<Record<string, string>>({});
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -325,6 +325,7 @@ export default function ClassActivitiesPage() {
           student_id: profile.id,
           status: 'completed',
           submission_content: 'Marked complete',
+          score: null,
           completed_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
           student: {
@@ -580,7 +581,6 @@ export default function ClassActivitiesPage() {
                           <button
                             type="button"
                             onClick={() => toggleMarkComplete(share.id)}
-                            disabled={togglingId === share.id}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold text-surface-600 hover:text-surface-900 bg-surface-100 hover:bg-surface-200 border border-surface-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
                             title="Mark as pending"
                           >
@@ -593,7 +593,6 @@ export default function ClassActivitiesPage() {
                           <button
                             type="button"
                             onClick={() => toggleMarkComplete(share.id)}
-                            disabled={togglingId === share.id}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
                             title="Submit"
                           >
