@@ -28,15 +28,15 @@ export function FlashcardActivity({
   const [currentIndex, setCurrentIndex] = useState<number>(() => savedSession?.currentIndex ?? 0);
   const [flipped, setFlipped] = useState(false);
   const [score, setScore] = useState<number>(() => savedSession?.score ?? 0);
-  const [correctIds, setCorrectIds] = useState<string[]>(() => savedSession?.correctIds ?? []);
+  const [correctIds, setCorrectIds] = useState<string[]>(() => savedSession?.correctQuestionIds ?? []);
 
   const total = content.length;
   const currentCard = content[currentIndex];
   const payload = (currentCard?.payload || {}) as FlashcardPayload;
   const progress = total > 0 ? ((currentIndex + 1) / total) * 100 : 0;
 
-  const frontText = payload.front || payload.question || 'No question provided';
-  const backText = payload.back || payload.answer || 'No answer provided';
+  const frontText = payload.front || (payload as any).question || 'No question provided';
+  const backText = payload.back || (payload as any).answer || 'No answer provided';
 
   const handleExit = () => {
     clearActivePlaySession();
@@ -65,19 +65,10 @@ export function FlashcardActivity({
       updateActivePlaySession({
         currentIndex: nextIdx,
         score: newScore,
-        correctIds: newCorrectIds,
+        correctQuestionIds: newCorrectIds,
       });
     }
   }, [currentCard?.id, currentIndex, total, score, correctIds, onComplete]);
-
-  const handlePrevious = useCallback(() => {
-    if (currentIndex > 0) {
-      const prevIdx = currentIndex - 1;
-      setCurrentIndex(prevIdx);
-      setFlipped(false);
-      updateActivePlaySession({ currentIndex: prevIdx });
-    }
-  }, [currentIndex]);
 
   const toggleFlip = useCallback((e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
