@@ -96,6 +96,21 @@ export default function PlayPage() {
         }
       }
 
+      // Check if activity is locked
+      if (!shareId && activityType) {
+        const { data: actData } = await supabase
+          .from('activities')
+          .select('is_locked, label')
+          .eq('key', activityType)
+          .maybeSingle();
+
+        if (actData?.is_locked) {
+          toast(`${actData.label || 'Activity'} is locked 🔒`, 'error');
+          navigate('/student/practice');
+          return;
+        }
+      }
+
       // 3. Fallback: Fetch standard chapter content if no custom content IDs
       const { data, error } = await supabase
         .from('content')
@@ -328,7 +343,7 @@ export default function PlayPage() {
   };
 
   return (
-    <div className={activityType === 'quiz' ? 'w-full min-h-screen flex flex-col' : 'max-w-2xl mx-auto py-4'}>
+    <div className={activityType === 'quiz' || activityType === 'flashcard' ? 'w-full min-h-screen flex flex-col' : 'max-w-2xl mx-auto py-4'}>
       {activityType === 'quiz' && <QuizActivity {...activityProps} />}
       {activityType === 'flashcard' && <FlashcardActivity {...activityProps} />}
       {activityType === 'matching' && <MatchingActivity {...activityProps} />}

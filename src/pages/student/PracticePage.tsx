@@ -237,8 +237,9 @@ const ActivityCardItem = memo(function ActivityCardItem({
       </div>
       <div className="flex-grow min-w-0 relative z-10">
         <h4
-          className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+          className="font-extrabold transition-colors text-sm sm:text-base md:text-lg truncate whitespace-nowrap block"
           style={{ color: cardColor }}
+          title={activity.label}
         >
           {activity.label}
         </h4>
@@ -309,17 +310,32 @@ export default function PracticePage() {
   // Activities from DB (dynamic, admin-managed)
   const [activities, setActivities] = useState<Activity[]>([]);
 
-  // Fetch activities from DB on mount
+  // Fetch activities from DB on mount + live changes
   useEffect(() => {
-    supabase
-      .from('activities')
-      .select('*')
-      .eq('is_active', true)
-      .order('zone')
-      .order('sort_order')
-      .then(({ data }) => {
-        if (data) setActivities(data as Activity[]);
-      });
+    const fetchActivities = () => {
+      supabase
+        .from('activities')
+        .select('*')
+        .eq('is_active', true)
+        .order('zone')
+        .order('sort_order')
+        .then(({ data }) => {
+          if (data) setActivities(data as Activity[]);
+        });
+    };
+
+    fetchActivities();
+
+    const channel = supabase
+      .channel('practice-activities-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => {
+        fetchActivities();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Compute available activity types instantaneously without network latency when selected chapters change

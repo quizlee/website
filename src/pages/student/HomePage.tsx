@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import type { Activity } from '../../lib/types';
-import { Target, Zap, Flame } from 'lucide-react';
+import { Target, Zap, Flame, Lock } from 'lucide-react';
+import { toast } from '../../components/ui/Toast';
 
 interface Stats {
   totalActivities: number;
@@ -13,9 +14,6 @@ interface Stats {
   totalPoints: number;
   schoolRank: number | null;
 }
-
-// Module-level in-memory cache for play zone activities
-let playZoneActivitiesCache: Activity[] | null = null;
 
 export default function StudentHomePage() {
   const { profile } = useAuthStore();
@@ -32,26 +30,36 @@ export default function StudentHomePage() {
   });
 
   // Activities from DB (admin-managed)
-  const [activities, setActivities] = useState<Activity[]>(() => playZoneActivitiesCache || []);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
-  // Fetch play zone activities from DB (with instant cache)
+  // Fetch play zone activities from DB (with real-time updates)
   useEffect(() => {
-    if (playZoneActivitiesCache) {
-      setActivities(playZoneActivitiesCache);
-      return;
-    }
-    supabase
-      .from('activities')
-      .select('*')
-      .eq('is_active', true)
-      .eq('zone', 'play')
-      .order('sort_order')
-      .then(({ data }) => {
-        if (data) {
-          playZoneActivitiesCache = data as Activity[];
-          setActivities(playZoneActivitiesCache);
-        }
-      });
+    const fetchActivities = () => {
+      supabase
+        .from('activities')
+        .select('*')
+        .eq('is_active', true)
+        .eq('zone', 'play')
+        .order('sort_order')
+        .then(({ data }) => {
+          if (data) {
+            setActivities(data as Activity[]);
+          }
+        });
+    };
+
+    fetchActivities();
+
+    const channel = supabase
+      .channel('homepage-activities-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => {
+        fetchActivities();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Fetch student stats with optimized queries and single-pass calculation
@@ -109,7 +117,11 @@ export default function StudentHomePage() {
   }, [profile?.id, profile?.points]);
 
 
-  const handleActivityClick = () => {
+  const handleActivityClick = (activity: Activity) => {
+    if (activity.is_locked) {
+      toast(`${activity.label} is locked 🔒`, 'error');
+      return;
+    }
     navigate('/student/practice');
   };
 
@@ -220,13 +232,15 @@ export default function StudentHomePage() {
             return (
               <div
                 key={activity.key}
-                onClick={handleActivityClick}
+                onClick={() => handleActivityClick(activity)}
                 className="group relative rounded-3xl p-3 sm:p-5 bouncy cursor-pointer flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full overflow-hidden transition-all duration-300 hover:-translate-y-1"
                 style={{
                   background: '#ffffff',
                   boxShadow: `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`,
                 }}
-                onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`)}
+                onMouseEnter={e => {
+                  if (!activity.is_locked) e.currentTarget.style.boxShadow = `0 10px 36px 0 rgba(0,0,0,0.13), 0 4px 16px 0 ${cardColor}40`;
+                }}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px 0 rgba(0,0,0,0.10), 0 2px 8px 0 ${cardColor}25`)}
               >
                 {/* Glow blob */}
@@ -234,6 +248,13 @@ export default function StudentHomePage() {
                   className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-40"
                   style={{ background: cardColor }}
                 />
+                {activity.is_locked && (
+                  <div className="absolute inset-0 rounded-3xl bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center p-2 pointer-events-none z-20">
+                    <span className="bg-white/95 text-slate-800 text-xs font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md border border-slate-200">
+                      <Lock size={13} className="text-slate-600" /> Locked
+                    </span>
+                  </div>
+                )}
                 <div
                   className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0 self-start sm:self-center text-2xl sm:text-3xl"
                   style={{
@@ -243,10 +264,11 @@ export default function StudentHomePage() {
                 >
                   {activity.emoji || '🎮'}
                 </div>
-                <div className="flex-grow relative z-10">
+                <div className="flex-grow min-w-0 relative z-10">
                   <h4
-                    className="font-extrabold transition-colors text-sm sm:text-base md:text-lg"
+                    className="font-extrabold transition-colors text-sm sm:text-base md:text-lg truncate whitespace-nowrap block"
                     style={{ color: cardColor }}
+                    title={activity.label}
                   >
                     {activity.label}
                   </h4>

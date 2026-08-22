@@ -102,7 +102,7 @@ export default function ClassActivitiesPage() {
   const [shares, setShares] = useState<Share[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, Submission>>({});
   const [allSubmissionsMap, setAllSubmissionsMap] = useState<Record<string, Submission[]>>({});
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('pending');
   const [chaptersMap, setChaptersMap] = useState<Record<string, string>>({});
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -253,16 +253,7 @@ export default function ClassActivitiesPage() {
         }
       }
 
-      if (!hasLoadedOnce) {
-        const hasPending = allShares.some((s) => !subMap[s.id]);
-        if (hasPending) {
-          setActiveTab('pending');
-        } else if (allShares.length > 0) {
-          setActiveTab('completed');
-        } else {
-          setActiveTab('pending');
-        }
-      }
+
 
       setShares(allShares);
       setSubmissions(subMap);
@@ -574,7 +565,7 @@ export default function ClassActivitiesPage() {
                       </div>
                     </div>
 
-                    {/* Top Right Corner: Submit button when pending, Undo button when completed */}
+                    {/* Top Right Corner: Done button when pending, Undone button when completed */}
                     <div className="shrink-0 ml-auto">
                       {isCompleted ? (
                         !isActivity && submission?.status !== 'verified' && (
@@ -585,7 +576,7 @@ export default function ClassActivitiesPage() {
                             title="Mark as pending"
                           >
                             <RotateCcw size={11} className="shrink-0 text-surface-500" />
-                            <span>Undo</span>
+                            <span>Undone</span>
                           </button>
                         )
                       ) : (
@@ -594,10 +585,10 @@ export default function ClassActivitiesPage() {
                             type="button"
                             onClick={() => toggleMarkComplete(share.id)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
-                            title="Submit"
+                            title="Done"
                           >
                             <Check size={11} className="shrink-0 text-emerald-600 stroke-[3]" />
-                            <span>Submit</span>
+                            <span>Done</span>
                           </button>
                         )
                       )}

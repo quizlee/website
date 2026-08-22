@@ -693,7 +693,7 @@ Answers: mitochondria`
     const chapterName = chapterObj?.name || 'Selected Chapter';
     const targetChapterText = aiChapterText.trim();
     const targetActivityType = aiActivityType;
-    const targetCount = Math.max(1, Math.min(50, parseInt(String(aiCount)) || 10));
+    const targetCount = Math.max(1, Math.min(500, parseInt(String(aiCount), 10) || 10));
 
     // Mark chapter as generating
     setGeneratingChapters((prev) => ({ ...prev, [targetChapterId]: true }));
@@ -2493,13 +2493,13 @@ ${textSubstrings}`;
                       <input
                         type="number"
                         min={1}
-                        max={50}
+                        max={500}
                         value={aiCount}
                         onChange={(e) => setAiCount(e.target.value)}
                         onBlur={() => {
                           const val = parseInt(String(aiCount), 10);
                           if (isNaN(val) || val < 1) setAiCount(1);
-                          else if (val > 50) setAiCount(50);
+                          else if (val > 500) setAiCount(500);
                           else setAiCount(val);
                         }}
                         className="w-full text-xs font-bold px-3 py-2 border border-surface-200 rounded-xl bg-white focus:outline-none focus:border-primary-500"
